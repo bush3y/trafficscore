@@ -1,5 +1,5 @@
 """
-TrafficScore API — FastAPI backend.
+TrafficScore API — FastAPI backend. v1.0
 
 Endpoints:
   GET /api/segments          GeoJSON of all scored segments (for map)
