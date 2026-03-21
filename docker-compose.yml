@@ -11,5 +11,17 @@ services:
       - pgdata:/var/lib/postgresql/data
       - ./db/schema.sql:/docker-entrypoint-initdb.d/schema.sql
 
+  app:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8383:8000"
+    environment:
+      - DATABASE_URL=postgresql://trafficscore:trafficscore@db:5432/trafficscore
+    depends_on:
+      - db
+    volumes:
+      - ./frontend:/app/frontend
+
 volumes:
   pgdata:
