@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TrafficScore Ottawa</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+
+    #map { width: 100vw; height: 100vh; }
+
+    #sidebar {
+      position: fixed;
+      top: 0; right: 0;
+      width: 320px;
+      height: 100vh;
+      background: white;
+      box-shadow: -2px 0 8px rgba(0,0,0,0.15);
+      padding: 20px;
+      overflow-y: auto;
+      z-index: 1000;
+      transform: translateX(100%);
+      transition: transform 0.2s ease;
+    }
+
+    #sidebar.open { transform: translateX(0); }
+
+    #sidebar h2 { font-size: 1rem; font-weight: 600; margin-bottom: 4px; }
+    #sidebar .road-class { color: #666; font-size: 0.85rem; margin-bottom: 16px; }
+
+    .score-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .score-label { font-size: 0.85rem; color: #444; }
+
+    .score-bar-wrap {
+      flex: 1;
+      height: 8px;
+      background: #eee;
+      border-radius: 4px;
+      margin: 0 10px;
+    }
+
+    .score-bar {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.3s;
+    }
+
+    .score-value { font-size: 0.85rem; font-weight: 600; width: 32px; text-align: right; }
+
+    .composite-score {
+      text-align: center;
+      margin: 16px 0;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+    }
+
+    .composite-score .big { font-size: 2rem; font-weight: 700; }
+
+    #legend {
+      position: fixed;
+      bottom: 24px;
+      left: 12px;
+      background: white;
+      border-radius: 8px;
+      padding: 12px 14px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      z-index: 1000;
+      font-size: 0.8rem;
+    }
+
+    #legend h4 { margin-bottom: 8px; font-size: 0.85rem; }
+
+    .legend-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+    .legend-swatch { width: 32px; height: 6px; border-radius: 3px; }
+
+    #controls {
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      background: white;
+      border-radius: 8px;
+      padding: 10px 14px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      z-index: 1000;
+    }
+
+    #controls h3 { font-size: 0.95rem; font-weight: 700; margin-bottom: 8px; }
+
+    select, input[type=range] { width: 100%; margin-top: 4px; }
+    label { font-size: 0.8rem; color: #444; }
+
+    #search-form { display: flex; gap: 6px; margin-bottom: 10px; }
+    #search-input {
+      flex: 1; padding: 5px 8px; border: 1px solid #ddd;
+      border-radius: 6px; font-size: 1rem;
+    }
+    #search-btn {
+      padding: 5px 10px; background: #3b82f6; color: white;
+      border: none; border-radius: 6px; font-size: 0.8rem; cursor: pointer;
+    }
+    #search-btn:hover { background: #2563eb; }
+    #search-results {
+      max-height: 140px; overflow-y: auto;
+      font-size: 0.78rem; margin-bottom: 8px;
+    }
+
+    .addr-message { font-size: 0.85rem; color: #444; font-style: italic; margin: 8px 0 16px; }
+    .search-result-item {
+      padding: 4px 6px; cursor: pointer; border-radius: 4px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .search-result-item:hover { background: #f0f0f0; }
+    .search-result-dot {
+      width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; margin-left: 6px;
+    }
+
+    #close-sidebar {
+      position: absolute;
+      top: 12px; right: 12px;
+      background: none;
+      border: none;
+      font-size: 1.2rem;
+      cursor: pointer;
+      color: #666;
+    }
+
+    /* ── Mobile ────────────────────────────────────────────── */
+    @media (max-width: 600px) {
+      /* Controls: stretch full width across the top */
+      #controls {
+        left: 8px;
+        right: 8px;
+        top: 8px;
+        width: auto;
+      }
+
+      /* Sidebar: full-width bottom sheet */
+      #sidebar {
+        top: auto;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        width: 100%;
+        height: 70vh;
+        border-radius: 16px 16px 0 0;
+        box-shadow: 0 -2px 12px rgba(0,0,0,0.15);
+        transform: translateY(100%);
+      }
+
+      #sidebar.open { transform: translateY(0); }
+
+      /* Drag handle visual cue */
+      #sidebar::before {
+        content: "";
+        display: block;
+        width: 40px;
+        height: 4px;
+        background: #ddd;
+        border-radius: 2px;
+        margin: 0 auto 16px;
+      }
+
+      /* Prevent iOS auto-zoom on input focus (requires font-size >= 16px) */
+      #search-input {
+        font-size: 1rem;
+        padding: 8px 10px;
+      }
+
+      #search-btn {
+        padding: 8px 14px;
+        font-size: 0.9rem;
+      }
+
+      /* Larger tap targets for result rows */
+      .search-result-item {
+        padding: 10px 8px;
+      }
+
+      /* Legend: compact, bottom-right so it doesn't clash with controls */
+      #legend {
+        bottom: 12px;
+        left: auto;
+        right: 12px;
+        font-size: 0.75rem;
+        padding: 8px 10px;
+      }
+
+      #legend h4 { font-size: 0.8rem; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div id="controls">
+  <h3>TrafficScore Ottawa</h3>
+  <form id="search-form">
+    <input id="search-input" type="text" placeholder="Street or address…" autocomplete="off" />
+    <button id="search-btn" type="submit">Go</button>
+  </form>
+  <div id="search-results"></div>
+  <label>Road type
+    <select id="road-class-filter">
+      <option value="">All roads</option>
+      <option value="residential">Residential</option>
+      <option value="tertiary">Tertiary</option>
+      <option value="secondary">Secondary</option>
+      <option value="primary">Primary</option>
+    </select>
+  </label>
+  <br><br>
+  <label>Max score (quieter streets)
+    <input type="range" id="max-score" min="10" max="100" value="100" />
+    <span id="max-score-label">Any</span>
+  </label>
+</div>
+
+<div id="sidebar">
+  <button id="close-sidebar" aria-label="Close">✕</button>
+  <div id="sidebar-content"></div>
+</div>
+
+<div id="legend">
+  <h4>Street score (lower = better)</h4>
+  <div class="legend-row"><div class="legend-swatch" style="background:#22c55e"></div> 0–20 Very quiet</div>
+  <div class="legend-row"><div class="legend-swatch" style="background:#facc15"></div> 20–35 Quiet</div>
+  <div class="legend-row"><div class="legend-swatch" style="background:#f97316"></div> 35–65 Moderate</div>
+  <div class="legend-row"><div class="legend-swatch" style="background:#ef4444"></div> 65+ Busy/concerning</div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  const map = L.map("map").setView([45.4215, -75.6972], 13);
+
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: "© OpenStreetMap contributors",
+    maxZoom: 19,
+  }).addTo(map);
+
+  let segmentLayer = null;
+
+  function scoreColor(score) {
+    if (score === null || score === undefined) return "#aaa";
+    if (score < 20)  return "#22c55e";
+    if (score < 35)  return "#facc15";
+    if (score < 65)  return "#f97316";
+    return "#ef4444";
+  }
+
+  function scoreLabel(score) {
+    if (score === null || score === undefined) return "No data";
+    if (score < 20)  return "Very quiet";
+    if (score < 35)  return "Quiet";
+    if (score < 65)  return "Moderate";
+    return "Busy / concerning";
+  }
+
+  function segmentColor(props) {
+    if (props.volume_score == null) return "#bbb";
+    return scoreColor(props.composite_score);
+  }
+
+  function segmentOpacity(props) {
+    return props.volume_score == null ? 0.4 : 0.85;
+  }
+
+  function barColor(score) {
+    return scoreColor(score);
+  }
+
+  function renderNeighbourhoodRow(score, name) {
+    if (score == null) return "";
+    const color = scoreColor(score);
+    const bg = color + "22";
+    const label = name ? `${name} neighbourhood score` : "Neighbourhood score";
+    return `
+      <div style="margin-top:16px;padding:10px 12px;background:${bg};border-radius:8px;display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:0.82rem;color:#444;">🏘 ${label}</span>
+        <span style="font-size:1.1rem;font-weight:700;color:${color}">${Math.round(score)}</span>
+      </div>`;
+  }
+
+  function renderSidebar(props) {
+    const sidebar = document.getElementById("sidebar");
+    const content = document.getElementById("sidebar-content");
+    const composite = props.composite_score;
+
+    const scoreRows = [
+      { label: "Volume",      value: props.volume_score },
+      { label: "Speed",       value: props.speed_score },
+      { label: "Safety",      value: props.safety_score },
+      { label: "Cut-through", value: props.cutthrough_score },
+      { label: "Trend",       value: props.trend_score },
+    ];
+
+    const noData = props.volume_score == null;
+    const bgColor = noData ? "#f5f5f5" : `${scoreColor(composite)}22`;
+
+    content.innerHTML = `
+      <h2>${props.name || "Unnamed street"}</h2>
+      <div class="road-class">${props.road_class || ""} · ${props.speed_limit ? props.speed_limit + " km/h" : "speed limit unknown"}</div>
+
+      <div class="composite-score" style="background:${bgColor}">
+        <div class="big" style="color:${noData ? "#aaa" : scoreColor(composite)}">${noData ? "—" : Math.round(composite)}</div>
+        <div>${noData ? "No traffic data" : scoreLabel(composite)}</div>
+      </div>
+
+      <div style="font-size:0.8rem;color:#888;margin-bottom:12px;">Score components (0=best, 100=worst)</div>
+
+      ${scoreRows.map(row => `
+        <div class="score-row">
+          <div class="score-label">${row.label}</div>
+          <div class="score-bar-wrap">
+            <div class="score-bar"
+              style="width:${row.value != null ? row.value : 0}%;background:${barColor(row.value)}">
+            </div>
+          </div>
+          <div class="score-value">${row.value != null ? Math.round(row.value) : "—"}</div>
+        </div>
+      `).join("")}
+
+      <div id="nb-row"></div>
+
+      ${props.cutthrough_risk != null ? `
+        <div style="margin-top:12px;font-size:0.8rem;color:#666;">
+          Cut-through risk: ${(props.cutthrough_risk * 100).toFixed(0)}%
+          (connects arterial roads: ${props.cutthrough_risk > 0.5 ? "yes" : "no"})
+        </div>
+      ` : ""}
+
+      <div style="margin-top:16px;font-size:0.75rem;color:#bbb;user-select:all;">ID: ${props.id}</div>
+    `;
+
+    sidebar.classList.add("open");
+
+    // Async neighbourhood score + name — fetch segment centroid then query both in parallel
+    fetch(`/api/segments/${props.id}`)
+      .then(r => r.json())
+      .then(seg => {
+        if (!seg.geometry) return;
+        const coords = seg.geometry.type === "LineString"
+          ? seg.geometry.coordinates[Math.floor(seg.geometry.coordinates.length / 2)]
+          : seg.geometry.coordinates[0][0];
+        const lat = coords[1], lng = coords[0];
+        return Promise.all([
+          fetch(`/api/neighbourhood?lat=${lat}&lng=${lng}`).then(r => r.json()),
+          fetch(`/api/reverse-geocode?lat=${lat}&lng=${lng}`).then(r => r.json()),
+        ]);
+      })
+      .then(([nb, geo]) => {
+        const el = document.getElementById("nb-row");
+        if (el && nb) el.innerHTML = renderNeighbourhoodRow(nb.avg_score, geo?.neighbourhood);
+      })
+      .catch(() => {});
+  }
+
+  function loadSegments() {
+    const roadClass = document.getElementById("road-class-filter").value;
+    const maxScore = parseInt(document.getElementById("max-score").value);
+
+    const bounds = map.getBounds();
+    const params = new URLSearchParams({
+      min_lon: bounds.getWest().toFixed(4),
+      min_lat: bounds.getSouth().toFixed(4),
+      max_lon: bounds.getEast().toFixed(4),
+      max_lat: bounds.getNorth().toFixed(4),
+    });
+    if (roadClass) params.append("road_class", roadClass);
+    if (maxScore < 100) params.append("max_composite", maxScore);
+
+    fetch(`/api/segments?${params}`)
+      .then(r => r.json())
+      .then(data => {
+        if (segmentLayer) map.removeLayer(segmentLayer);
+
+        segmentLayer = L.geoJSON(data, {
+          style: feature => ({
+            color: segmentColor(feature.properties),
+            weight: 3,
+            opacity: segmentOpacity(feature.properties),
+          }),
+          onEachFeature: (feature, layer) => {
+            layer.on("click", () => renderSidebar(feature.properties));
+          },
+        }).addTo(map);
+      })
+      .catch(err => console.error("Failed to load segments:", err));
+  }
+
+  // Search
+  let searchLayer = null;
+  let addressMarker = null;
+  let searchAbort = null;
+  const geocodeCache = new Map();
+
+  function looksLikeAddress(q) {
+    return /^\d+\s/.test(q);
+  }
+
+  function doStreetSearch(q) {
+    if (addressMarker) { map.removeLayer(addressMarker); addressMarker = null; }
+    document.getElementById("sidebar").classList.remove("open");
+    const resultsEl = document.getElementById("search-results");
+    fetch(`/api/search?name=${encodeURIComponent(q)}`)
+      .then(r => r.json())
+      .then(data => {
+        if (!data.features.length) {
+          resultsEl.innerHTML = `<div style="color:#888;padding:4px 6px;">No results for "${q}"</div>`;
+          return;
+        }
+
+        // Group by street name
+        const byName = {};
+        for (const f of data.features) {
+          const n = f.properties.name || "Unnamed";
+          if (!byName[n]) byName[n] = [];
+          byName[n].push(f);
+        }
+
+        resultsEl.innerHTML = Object.entries(byName).map(([name, feats]) => {
+          const avg = feats.reduce((s, f) => s + (f.properties.composite_score || 0), 0) / feats.length;
+          return `<div class="search-result-item" data-name="${name}">
+            <span>${name}</span>
+            <span style="display:flex;align-items:center;gap:4px;color:#666;">
+              ${Math.round(avg)}
+              <span class="search-result-dot" style="background:${scoreColor(avg)}"></span>
+            </span>
+          </div>`;
+        }).join("");
+
+        // Click a result → fly to it, highlight, and open sidebar
+        resultsEl.querySelectorAll(".search-result-item").forEach(el => {
+          el.addEventListener("click", () => {
+            const name = el.dataset.name;
+            const feats = byName[name];
+
+            if (searchLayer) map.removeLayer(searchLayer);
+            searchLayer = L.geoJSON({ type: "FeatureCollection", features: feats }, {
+              style: f => ({
+                color: segmentColor(f.properties),
+                weight: 5,
+                opacity: segmentOpacity(f.properties),
+              }),
+              onEachFeature: (feature, layer) => {
+                layer.on("click", () => renderSidebar(feature.properties));
+              },
+            }).addTo(map);
+
+            map.setView(searchLayer.getBounds().getCenter(), 17);
+            renderSidebar(feats[0].properties);
+          });
+        });
+
+        // Auto-select if only one unique name
+        if (Object.keys(byName).length === 1) {
+          resultsEl.querySelector(".search-result-item").click();
+        }
+      })
+      .catch(err => console.error("Search failed:", err));
+  }
+
+function addressMessage(score) {
+    if (score < 20) return "Very quiet — great for kids playing outside.";
+    if (score < 35) return "Quiet street with generally low traffic.";
+    if (score < 65) return "Moderate traffic — some through-traffic likely.";
+    return "Busy or high-traffic street — exercise caution.";
+  }
+
+  function renderAddressCard(segment, addressShortName, neighbourhood, neighbourhoodScore) {
+    const p = segment.properties;
+    const score = p.composite_score;
+    const color = scoreColor(score);
+    const bg = color + "22";
+
+    const scoreRows = [
+      { label: "Volume",      value: p.volume_score },
+      { label: "Speed",       value: p.speed_score },
+      { label: "Safety",      value: p.safety_score },
+      { label: "Cut-through", value: p.cutthrough_score },
+    ];
+
+    const sidebar = document.getElementById("sidebar");
+    const content = document.getElementById("sidebar-content");
+
+    content.innerHTML = `
+      <div style="font-size:0.8rem;color:#888;margin-bottom:4px;">📍 ${addressShortName}</div>
+      <h2>${p.name || "Unnamed street"}</h2>
+      <div class="road-class">${p.road_class || ""} · ${p.speed_limit ? p.speed_limit + " km/h" : "speed limit unknown"}</div>
+
+      <div class="composite-score" style="background:${bg}">
+        <div class="big" style="color:${color}">${Math.round(score)}</div>
+        <div>${scoreLabel(score)}</div>
+      </div>
+
+      <div class="addr-message">${addressMessage(score)}</div>
+
+      <div style="font-size:0.8rem;color:#888;margin-bottom:12px;">Score components (0=best, 100=worst)</div>
+
+      ${scoreRows.map(row => `
+        <div class="score-row">
+          <div class="score-label">${row.label}</div>
+          <div class="score-bar-wrap">
+            <div class="score-bar"
+              style="width:${row.value != null ? row.value : 0}%;background:${scoreColor(row.value)}">
+            </div>
+          </div>
+          <div class="score-value">${row.value != null ? Math.round(row.value) : "—"}</div>
+        </div>
+      `).join("")}
+
+      ${renderNeighbourhoodRow(neighbourhoodScore, neighbourhood)}
+    `;
+
+    sidebar.classList.add("open");
+  }
+
+  function doAddressSearch(q) {
+    const resultsEl = document.getElementById("search-results");
+    resultsEl.innerHTML = `<div style="color:#888;padding:4px 6px;">Looking up address…</div>`;
+    document.getElementById("sidebar").classList.remove("open");
+
+    // Cancel any in-flight search
+    if (searchAbort) searchAbort.abort();
+    searchAbort = new AbortController();
+    const signal = searchAbort.signal;
+
+    const geocodeKey = q.toLowerCase();
+    const cached = geocodeCache.get(geocodeKey);
+    const geocodePromise = cached
+      ? Promise.resolve(cached)
+      : fetch(`/api/geocode?q=${encodeURIComponent(q)}`, { signal })
+          .then(r => r.json())
+          .then(results => {
+            if (results.length) geocodeCache.set(geocodeKey, results);
+            return results;
+          });
+
+    geocodePromise
+      .then(results => {
+        if (signal.aborted) return;
+        if (!results.length) {
+          resultsEl.innerHTML = "";
+          doStreetSearch(q);
+          return;
+        }
+
+        const { lat, lon, display_name } = results[0];
+        const latF = parseFloat(lat), lonF = parseFloat(lon);
+
+        // Drop a pin and fly to it
+        if (addressMarker) map.removeLayer(addressMarker);
+        addressMarker = L.marker([latF, lonF]).addTo(map);
+        map.setView([latF, lonF], 18);
+
+        // Nominatim sometimes splits house number: "564, Highcroft Avenue, ..."
+        const dnParts = display_name.split(", ");
+        const shortName = /^\d+$/.test(dnParts[0]) ? `${dnParts[0]} ${dnParts[1]}` : dnParts[0];
+
+        // Load nearby streets, neighbourhood score, and neighbourhood name in parallel
+        Promise.all([
+          fetch(`/api/segments/nearby?lat=${lat}&lng=${lon}&radius_m=200`, { signal }).then(r => r.json()),
+          fetch(`/api/neighbourhood?lat=${lat}&lng=${lon}`, { signal }).then(r => r.json()),
+          fetch(`/api/reverse-geocode?lat=${lat}&lng=${lon}`, { signal }).then(r => r.json()),
+        ]).then(([data, nbData, geoData]) => {
+            if (signal.aborted) return;
+            const nearby = data.features;
+            const neighbourhood = geoData.neighbourhood;
+
+            resultsEl.innerHTML = "";
+
+            if (!nearby.length) {
+              resultsEl.innerHTML = `<div style="color:#888;padding:4px 6px;">No scored streets within 200m</div>`;
+              return;
+            }
+
+            // Highlight nearby streets on map
+            if (searchLayer) map.removeLayer(searchLayer);
+            searchLayer = L.geoJSON(data, {
+              style: f => ({
+                color: segmentColor(f.properties),
+                weight: 5,
+                opacity: segmentOpacity(f.properties),
+              }),
+              onEachFeature: (feature, layer) => {
+                layer.on("click", () => renderSidebar(feature.properties));
+              },
+            }).addTo(map);
+
+            // Always use the geometrically closest segment — its score is correct.
+            // If it's unnamed, infer the street name from the search query.
+            const nearest = nearby[0];
+            if (!nearest.properties.name) {
+              nearest.properties.name = q.replace(/^\d+\s+/, "")
+                .replace(/\b\w/g, c => c.toUpperCase());
+            }
+            renderAddressCard(nearest, shortName, neighbourhood, nbData.avg_score);
+
+            // Show other nearby streets as a secondary list
+            const byName = {};
+            for (const f of nearby) {
+              const n = f.properties.name || "Unnamed";
+              if (n === (nearest.properties.name || "Unnamed")) continue;
+              if (!byName[n]) byName[n] = [];
+              byName[n].push(f);
+            }
+
+            if (Object.keys(byName).length) {
+              resultsEl.innerHTML = `<div style="font-size:0.75rem;color:#888;padding:2px 6px 4px;">Nearby streets</div>`;
+              resultsEl.innerHTML += Object.entries(byName).slice(0, 5).map(([name, feats]) => {
+                const avg = feats.reduce((s, f) => s + (f.properties.composite_score || 0), 0) / feats.length;
+                const dist = Math.round(feats[0].properties.distance_m);
+                return `<div class="search-result-item" data-name="${name}">
+                  <span>${name} <span style="color:#bbb;font-size:0.75rem;">${dist}m</span></span>
+                  <span style="display:flex;align-items:center;gap:4px;color:#666;">
+                    ${Math.round(avg)}
+                    <span class="search-result-dot" style="background:${scoreColor(avg)}"></span>
+                  </span>
+                </div>`;
+              }).join("");
+
+              resultsEl.querySelectorAll(".search-result-item").forEach(el => {
+                el.addEventListener("click", () => {
+                  const feats = byName[el.dataset.name];
+                  renderSidebar(feats[0].properties);
+                });
+              });
+            }
+          });
+      })
+      .catch(err => {
+        if (err.name === "AbortError") return;
+        doStreetSearch(q);
+      });
+  }
+
+  document.getElementById("search-form").addEventListener("submit", e => {
+    e.preventDefault();
+    const q = document.getElementById("search-input").value.trim();
+    if (q.length < 2) return;
+    if (looksLikeAddress(q)) {
+      doAddressSearch(q);
+    } else {
+      doStreetSearch(q);
+    }
+  });
+
+  // Controls
+  document.getElementById("close-sidebar").addEventListener("click", () => {
+    document.getElementById("sidebar").classList.remove("open");
+  });
+
+  const maxScoreInput = document.getElementById("max-score");
+  const maxScoreLabel = document.getElementById("max-score-label");
+  maxScoreInput.addEventListener("input", () => {
+    const v = parseInt(maxScoreInput.value);
+    maxScoreLabel.textContent = v < 100 ? `≤ ${v}` : "Any";
+  });
+
+  document.getElementById("road-class-filter").addEventListener("change", loadSegments);
+  maxScoreInput.addEventListener("change", loadSegments);
+
+  // Load on map move (debounced)
+  let moveTimer = null;
+  map.on("moveend", () => {
+    clearTimeout(moveTimer);
+    moveTimer = setTimeout(loadSegments, 400);
+  });
+
+  // Initial load
+  loadSegments();
+</script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+psycopg2-binary==2.9.9
+requests==2.31.0
+python-dotenv==1.0.0
+
+# OSM / geospatial
+osmnx==1.9.1
+shapely==2.0.4
+geopandas==0.14.4
+
+# Scheduling
+apscheduler==3.10.4
+
+# API
+fastapi==0.111.0
+uvicorn==0.29.0
+
+# Data
+pandas==2.2.2
