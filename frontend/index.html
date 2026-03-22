@@ -105,6 +105,7 @@
     }
 
     #controls-header h3 { font-size: 0.95rem; font-weight: 700; }
+    #controls-tagline { font-size: 0.75rem; color: #888; margin-bottom: 8px; }
 
     #filters-toggle { display: none; }
 
@@ -250,6 +251,7 @@
     <h3>TrafficScore Ottawa</h3>
     <button id="filters-toggle">Filters ▾</button>
   </div>
+  <div id="controls-tagline">Find out how busy your street really is</div>
   <form id="search-form">
     <input id="search-input" type="text" placeholder="Street or address…" autocomplete="off" />
     <button id="search-btn" type="submit">Go</button>
@@ -629,7 +631,14 @@ function addressMessage(score) {
 
         // Drop a pin and fly to it
         if (addressMarker) map.removeLayer(addressMarker);
-        addressMarker = L.marker([latF, lonF]).addTo(map);
+        addressMarker = L.marker([latF, lonF], {
+          icon: L.divIcon({
+            className: "",
+            html: '<div style="width:14px;height:14px;background:#3b82f6;border:2px solid white;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>',
+            iconSize: [14, 14],
+            iconAnchor: [7, 7],
+          })
+        }).addTo(map);
         map.setView([latF, lonF], 18);
 
         // Nominatim sometimes splits house number: "564, Highcroft Avenue, ..."
