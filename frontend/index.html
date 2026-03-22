@@ -230,9 +230,14 @@
         right: 12px;
         font-size: 0.75rem;
         padding: 8px 10px;
+        transition: bottom 0.25s ease, opacity 0.25s ease;
       }
 
       #legend h4 { font-size: 0.8rem; }
+
+      /* Raise legend above peek card, hide when fully open */
+      body.sidebar-peek #legend { bottom: 200px; }
+      body.sidebar-open #legend { opacity: 0; pointer-events: none; }
     }
   </style>
 </head>
@@ -329,15 +334,20 @@
     if (isMobile()) {
       sidebar.classList.remove("open");
       sidebar.classList.add("peek");
+      document.body.classList.remove("sidebar-open");
+      document.body.classList.add("sidebar-peek");
     } else {
       sidebar.classList.remove("peek");
       sidebar.classList.add("open");
+      document.body.classList.remove("sidebar-peek");
+      document.body.classList.add("sidebar-open");
     }
   }
 
   function closeSidebar() {
     const sidebar = document.getElementById("sidebar");
     sidebar.classList.remove("open", "peek");
+    document.body.classList.remove("sidebar-peek", "sidebar-open");
   }
 
   function renderNeighbourhoodRow(score, name) {
@@ -674,8 +684,9 @@ function addressMessage(score) {
             }
 
             if (Object.keys(byName).length) {
-              resultsEl.innerHTML = `<div style="font-size:0.75rem;color:#888;padding:2px 6px 4px;">Nearby streets</div>`;
-              resultsEl.innerHTML += Object.entries(byName).slice(0, 5).map(([name, feats]) => {
+              const nearbyNames = Object.entries(byName).slice(0, 5);
+              const startOpen = !isMobile();
+              const itemsHtml = nearbyNames.map(([name, feats]) => {
                 const avg = feats.reduce((s, f) => s + (f.properties.composite_score || 0), 0) / feats.length;
                 const dist = Math.round(feats[0].properties.distance_m);
                 return `<div class="search-result-item" data-name="${name}">
@@ -686,6 +697,22 @@ function addressMessage(score) {
                   </span>
                 </div>`;
               }).join("");
+
+              resultsEl.innerHTML = `
+                <div id="nearby-toggle" style="font-size:0.75rem;color:#666;padding:4px 6px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-top:1px solid #eee;margin-top:4px;">
+                  <span>Nearby streets</span>
+                  <span id="nearby-arrow">${startOpen ? "▴" : "▾"}</span>
+                </div>
+                <div id="nearby-list" style="display:${startOpen ? "block" : "none"}">${itemsHtml}</div>
+              `;
+
+              document.getElementById("nearby-toggle").addEventListener("click", () => {
+                const list = document.getElementById("nearby-list");
+                const arrow = document.getElementById("nearby-arrow");
+                const open = list.style.display === "none";
+                list.style.display = open ? "block" : "none";
+                arrow.textContent = open ? "▴" : "▾";
+              });
 
               resultsEl.querySelectorAll(".search-result-item").forEach(el => {
                 el.addEventListener("click", () => {
@@ -723,9 +750,13 @@ function addressMessage(score) {
     if (sidebar.classList.contains("peek")) {
       sidebar.classList.remove("peek");
       sidebar.classList.add("open");
+      document.body.classList.remove("sidebar-peek");
+      document.body.classList.add("sidebar-open");
     } else if (sidebar.classList.contains("open")) {
       sidebar.classList.remove("open");
       sidebar.classList.add("peek");
+      document.body.classList.remove("sidebar-open");
+      document.body.classList.add("sidebar-peek");
     }
   });
 
