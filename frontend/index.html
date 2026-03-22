@@ -179,14 +179,15 @@
         display: block;
       }
 
-      /* Sidebar: bottom sheet */
+      /* Sidebar: bottom sheet, sizes to content */
       #sidebar {
         top: auto;
         bottom: 0;
         left: 0;
         right: 0;
         width: 100%;
-        height: 75vh;
+        height: auto;
+        max-height: calc(100vh - 120px);
         border-radius: 16px 16px 0 0;
         box-shadow: 0 -2px 12px rgba(0,0,0,0.15);
         transform: translateY(100%);
@@ -196,11 +197,8 @@
       /* Peek: shows handle + street name + score chip */
       #sidebar.peek { transform: translateY(calc(100% - 185px)); }
 
-      /* Expanded: tall enough to show full card without reaching the controls */
-      #sidebar.open {
-        transform: translateY(0);
-        height: 55vh;
-      }
+      /* Expanded: content height, won't overlap controls */
+      #sidebar.open { transform: translateY(0); }
 
       /* Drag handle */
       #sidebar-handle {
