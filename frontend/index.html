@@ -23,10 +23,12 @@
       overflow-y: auto;
       z-index: 1000;
       transform: translateX(100%);
-      transition: transform 0.2s ease;
+      transition: transform 0.25s ease;
     }
 
     #sidebar.open { transform: translateX(0); }
+
+    #sidebar-handle { display: none; }
 
     #sidebar h2 { font-size: 1rem; font-weight: 600; margin-bottom: 4px; }
     #sidebar .road-class { color: #666; font-size: 0.85rem; margin-bottom: 16px; }
@@ -94,7 +96,17 @@
       z-index: 1000;
     }
 
-    #controls h3 { font-size: 0.95rem; font-weight: 700; margin-bottom: 8px; }
+    #controls-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      gap: 10px;
+    }
+
+    #controls-header h3 { font-size: 0.95rem; font-weight: 700; }
+
+    #filters-toggle { display: none; }
 
     select, input[type=range] { width: 100%; margin-top: 4px; }
     label { font-size: 0.8rem; color: #444; }
@@ -144,49 +156,74 @@
         width: auto;
       }
 
-      /* Sidebar: full-width bottom sheet */
+      /* Collapsible filters */
+      #filters-toggle {
+        display: block;
+        background: none;
+        border: 1px solid #3b82f6;
+        color: #3b82f6;
+        border-radius: 5px;
+        padding: 3px 8px;
+        font-size: 0.75rem;
+        cursor: pointer;
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
+
+      #filters-panel {
+        display: none;
+      }
+
+      #filters-panel.open {
+        display: block;
+      }
+
+      /* Sidebar: bottom sheet */
       #sidebar {
         top: auto;
         bottom: 0;
         left: 0;
         right: 0;
         width: 100%;
-        height: 70vh;
+        height: 75vh;
         border-radius: 16px 16px 0 0;
         box-shadow: 0 -2px 12px rgba(0,0,0,0.15);
         transform: translateY(100%);
+        overflow-y: auto;
       }
 
+      /* Peek: shows handle + street name + score chip */
+      #sidebar.peek { transform: translateY(calc(100% - 185px)); }
+
+      /* Expanded: most of screen */
       #sidebar.open { transform: translateY(0); }
 
-      /* Drag handle visual cue */
-      #sidebar::before {
-        content: "";
-        display: block;
+      /* Drag handle */
+      #sidebar-handle {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 10px 0 8px;
+        cursor: pointer;
+        margin: -20px -20px 8px;  /* extend to edges over the padding */
+        user-select: none;
+      }
+
+      .handle-bar {
         width: 40px;
         height: 4px;
         background: #ddd;
         border-radius: 2px;
-        margin: 0 auto 16px;
       }
 
-      /* Prevent iOS auto-zoom on input focus (requires font-size >= 16px) */
-      #search-input {
-        font-size: 1rem;
-        padding: 8px 10px;
-      }
+      /* Prevent iOS auto-zoom on input focus */
+      #search-input { font-size: 1rem; padding: 8px 10px; }
+      #search-btn { padding: 8px 14px; font-size: 0.9rem; }
 
-      #search-btn {
-        padding: 8px 14px;
-        font-size: 0.9rem;
-      }
+      /* Larger tap targets */
+      .search-result-item { padding: 10px 8px; }
 
-      /* Larger tap targets for result rows */
-      .search-result-item {
-        padding: 10px 8px;
-      }
-
-      /* Legend: compact, bottom-right so it doesn't clash with controls */
+      /* Legend: compact, bottom-right */
       #legend {
         bottom: 12px;
         left: auto;
@@ -204,29 +241,35 @@
 <div id="map"></div>
 
 <div id="controls">
-  <h3>TrafficScore Ottawa</h3>
+  <div id="controls-header">
+    <h3>TrafficScore Ottawa</h3>
+    <button id="filters-toggle">Filters ▾</button>
+  </div>
   <form id="search-form">
     <input id="search-input" type="text" placeholder="Street or address…" autocomplete="off" />
     <button id="search-btn" type="submit">Go</button>
   </form>
   <div id="search-results"></div>
-  <label>Road type
-    <select id="road-class-filter">
-      <option value="">All roads</option>
-      <option value="residential">Residential</option>
-      <option value="tertiary">Tertiary</option>
-      <option value="secondary">Secondary</option>
-      <option value="primary">Primary</option>
-    </select>
-  </label>
-  <br><br>
-  <label>Max score (quieter streets)
-    <input type="range" id="max-score" min="10" max="100" value="100" />
-    <span id="max-score-label">Any</span>
-  </label>
+  <div id="filters-panel">
+    <label>Road type
+      <select id="road-class-filter">
+        <option value="">All roads</option>
+        <option value="residential">Residential</option>
+        <option value="tertiary">Tertiary</option>
+        <option value="secondary">Secondary</option>
+        <option value="primary">Primary</option>
+      </select>
+    </label>
+    <br><br>
+    <label>Max score (quieter streets)
+      <input type="range" id="max-score" min="10" max="100" value="100" />
+      <span id="max-score-label">Any</span>
+    </label>
+  </div>
 </div>
 
 <div id="sidebar">
+  <div id="sidebar-handle"><div class="handle-bar"></div></div>
   <button id="close-sidebar" aria-label="Close">✕</button>
   <div id="sidebar-content"></div>
 </div>
@@ -249,6 +292,8 @@
   }).addTo(map);
 
   let segmentLayer = null;
+
+  function isMobile() { return window.innerWidth <= 600; }
 
   function scoreColor(score) {
     if (score === null || score === undefined) return "#aaa";
@@ -279,6 +324,22 @@
     return scoreColor(score);
   }
 
+  function openSidebar() {
+    const sidebar = document.getElementById("sidebar");
+    if (isMobile()) {
+      sidebar.classList.remove("open");
+      sidebar.classList.add("peek");
+    } else {
+      sidebar.classList.remove("peek");
+      sidebar.classList.add("open");
+    }
+  }
+
+  function closeSidebar() {
+    const sidebar = document.getElementById("sidebar");
+    sidebar.classList.remove("open", "peek");
+  }
+
   function renderNeighbourhoodRow(score, name) {
     if (score == null) return "";
     const color = scoreColor(score);
@@ -292,7 +353,6 @@
   }
 
   function renderSidebar(props) {
-    const sidebar = document.getElementById("sidebar");
     const content = document.getElementById("sidebar-content");
     const composite = props.composite_score;
 
@@ -342,9 +402,9 @@
       <div style="margin-top:16px;font-size:0.75rem;color:#bbb;user-select:all;">ID: ${props.id}</div>
     `;
 
-    sidebar.classList.add("open");
+    openSidebar();
 
-    // Async neighbourhood score + name — fetch segment centroid then query both in parallel
+    // Async neighbourhood score + name
     fetch(`/api/segments/${props.id}`)
       .then(r => r.json())
       .then(seg => {
@@ -410,7 +470,7 @@
 
   function doStreetSearch(q) {
     if (addressMarker) { map.removeLayer(addressMarker); addressMarker = null; }
-    document.getElementById("sidebar").classList.remove("open");
+    closeSidebar();
     const resultsEl = document.getElementById("search-results");
     fetch(`/api/search?name=${encodeURIComponent(q)}`)
       .then(r => r.json())
@@ -490,7 +550,6 @@ function addressMessage(score) {
       { label: "Cut-through", value: p.cutthrough_score },
     ];
 
-    const sidebar = document.getElementById("sidebar");
     const content = document.getElementById("sidebar-content");
 
     content.innerHTML = `
@@ -522,13 +581,13 @@ function addressMessage(score) {
       ${renderNeighbourhoodRow(neighbourhoodScore, neighbourhood)}
     `;
 
-    sidebar.classList.add("open");
+    openSidebar();
   }
 
   function doAddressSearch(q) {
     const resultsEl = document.getElementById("search-results");
     resultsEl.innerHTML = `<div style="color:#888;padding:4px 6px;">Looking up address…</div>`;
-    document.getElementById("sidebar").classList.remove("open");
+    closeSidebar();
 
     // Cancel any in-flight search
     if (searchAbort) searchAbort.abort();
@@ -597,8 +656,7 @@ function addressMessage(score) {
               },
             }).addTo(map);
 
-            // Always use the geometrically closest segment — its score is correct.
-            // If it's unnamed, infer the street name from the search query.
+            // Always use the geometrically closest segment
             const nearest = nearby[0];
             if (!nearest.properties.name) {
               nearest.properties.name = q.replace(/^\d+\s+/, "")
@@ -655,9 +713,28 @@ function addressMessage(score) {
     }
   });
 
-  // Controls
-  document.getElementById("close-sidebar").addEventListener("click", () => {
-    document.getElementById("sidebar").classList.remove("open");
+  // Close sidebar
+  document.getElementById("close-sidebar").addEventListener("click", closeSidebar);
+
+  // Handle tap: toggle peek ↔ open
+  document.getElementById("sidebar-handle").addEventListener("click", () => {
+    if (!isMobile()) return;
+    const sidebar = document.getElementById("sidebar");
+    if (sidebar.classList.contains("peek")) {
+      sidebar.classList.remove("peek");
+      sidebar.classList.add("open");
+    } else if (sidebar.classList.contains("open")) {
+      sidebar.classList.remove("open");
+      sidebar.classList.add("peek");
+    }
+  });
+
+  // Filters toggle
+  document.getElementById("filters-toggle").addEventListener("click", () => {
+    const panel = document.getElementById("filters-panel");
+    const btn = document.getElementById("filters-toggle");
+    const open = panel.classList.toggle("open");
+    btn.textContent = open ? "Filters ▴" : "Filters ▾";
   });
 
   const maxScoreInput = document.getElementById("max-score");
