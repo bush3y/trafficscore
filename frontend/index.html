@@ -196,8 +196,11 @@
       /* Peek: shows handle + street name + score chip */
       #sidebar.peek { transform: translateY(calc(100% - 185px)); }
 
-      /* Expanded: most of screen */
-      #sidebar.open { transform: translateY(0); }
+      /* Expanded: stops just below the controls panel */
+      #sidebar.open {
+        transform: translateY(0);
+        height: calc(100vh - 130px);
+      }
 
       /* Drag handle */
       #sidebar-handle {
