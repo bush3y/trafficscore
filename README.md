@@ -123,11 +123,13 @@ trafficscore/
 - TomTom data is not included (commercial licence required)
 - ~261 segments with no TomTom coverage (mostly rural Ottawa) display grey on the map
 - Cut-through score is only computed for residential/unclassified streets; arterials show N/A
-- Currently local-only — no hosted deployment yet
+- Hosted at [trafficscore.myke.org](https://trafficscore.myke.org) (Ottawa only)
 
 ## Data Sources
 
-- **Road network**: [OpenStreetMap](https://www.openstreetmap.org/) via osmnx
-- **Traffic data**: TomTom Move (probe counts + speed percentiles)
-- **Collisions**: [City of Ottawa Open Data](https://open.ottawa.ca) — Traffic Collision Data
-- **Intersection volumes**: City of Ottawa Open Data — Intersection Volume counts
+| Source | Coverage | Notes |
+|--------|----------|-------|
+| TomTom Traffic Stats | August 2024 | Trial account — one month snapshot. A paid account supports up to 732 days of history, which would smooth out seasonal variation and give more reliable averages. |
+| City of Ottawa — Collision Data | 2017–2024 | Used for safety score component |
+| City of Ottawa — Intersection Volumes | 2018–2023 | Used for trend score (currently stored but not weighted in composite) |
+| OpenStreetMap | Current at time of ingest | Road network via osmnx |
