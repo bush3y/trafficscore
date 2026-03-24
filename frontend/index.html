@@ -448,7 +448,7 @@
         return Promise.all([
           fetch(`/api/neighbourhood?lat=${lat}&lng=${lng}`).then(r => r.json()),
           fetch(`/api/reverse-geocode?lat=${lat}&lng=${lng}`).then(r => r.json()),
-          fetch(`/api/segments/${props.id}/relative?lat=${lat}&lng=${lng}`).then(r => r.json()),
+          fetch(`/api/relative?road_class=${encodeURIComponent(props.road_class)}&score=${props.composite_score}&lat=${lat}&lng=${lng}`).then(r => r.json()).catch(() => null),
         ]);
       })
       .then(([nb, geo, rel]) => {
@@ -708,7 +708,8 @@ function addressMessage(score) {
             renderAddressCard(nearest, shortName, neighbourhood, nbData.avg_score);
 
             // Async relative stats
-            fetch(`/api/segments/${nearest.properties.id}/relative?lat=${lat}&lng=${lon}`)
+            const p = nearest.properties;
+            fetch(`/api/relative?road_class=${encodeURIComponent(p.road_class)}&score=${p.composite_score}&lat=${lat}&lng=${lon}`)
               .then(r => r.json())
               .then(rel => {
                 const el = document.getElementById("relative-row");

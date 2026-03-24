@@ -230,9 +230,10 @@ def get_segment(segment_id: int):
     }
 
 
-@app.get("/api/segments/{segment_id}/relative")
+@app.get("/api/relative")
 def get_relative(
-    segment_id: int,
+    road_class: str = Query(...),
+    score: float = Query(...),
     lat: float = Query(...),
     lng: float = Query(...),
     radius_m: int = Query(600),
@@ -241,51 +242,34 @@ def get_relative(
     conn = get_conn()
     cur = conn.cursor()
 
-    # Get road class
+    # City-wide: how many same-class segments score <= this one
     cur.execute("""
-        SELECT rs.road_class FROM road_segments rs
+        SELECT
+            ROUND(
+                (COUNT(*) FILTER (WHERE ss.composite_score <= %s))::numeric /
+                NULLIF(COUNT(*), 0) * 100
+            )::int AS percentile,
+            COUNT(*) AS total
+        FROM road_segments rs
         JOIN street_scores ss ON ss.segment_id = rs.id
-        WHERE rs.id = %s AND ss.composite_score IS NOT NULL
-    """, [segment_id])
-    seg = cur.fetchone()
-    if not seg:
-        cur.close(); conn.close()
-        raise HTTPException(status_code=404, detail="Segment not found")
-
-    road_class = seg["road_class"]
-
-    # City-wide percentile within road class
-    cur.execute("""
-        WITH ranked AS (
-            SELECT rs.id,
-                ROUND(PERCENT_RANK() OVER (ORDER BY ss.composite_score) * 100)::int AS percentile,
-                COUNT(*) OVER () AS total
-            FROM road_segments rs
-            JOIN street_scores ss ON ss.segment_id = rs.id
-            WHERE rs.road_class = %s AND ss.composite_score IS NOT NULL
-        )
-        SELECT percentile, total FROM ranked WHERE id = %s
-    """, [road_class, segment_id])
+        WHERE rs.road_class = %s AND ss.composite_score IS NOT NULL
+    """, [score, road_class])
     city = cur.fetchone()
 
-    # Neighbourhood percentile within road class
+    # Neighbourhood: same-class segments within radius
     cur.execute("""
-        WITH nb AS (
-            SELECT rs.id, ss.composite_score
-            FROM road_segments rs
-            JOIN street_scores ss ON ss.segment_id = rs.id
-            WHERE rs.road_class = %s
-              AND ST_DWithin(rs.geometry::geography, ST_MakePoint(%s, %s)::geography, %s)
-              AND ss.composite_score IS NOT NULL
-        ),
-        ranked AS (
-            SELECT id,
-                ROUND(PERCENT_RANK() OVER (ORDER BY composite_score) * 100)::int AS percentile,
-                COUNT(*) OVER () AS total
-            FROM nb
-        )
-        SELECT percentile, total FROM ranked WHERE id = %s
-    """, [road_class, lng, lat, radius_m, segment_id])
+        SELECT
+            ROUND(
+                (COUNT(*) FILTER (WHERE ss.composite_score <= %s))::numeric /
+                NULLIF(COUNT(*), 0) * 100
+            )::int AS percentile,
+            COUNT(*) AS total
+        FROM road_segments rs
+        JOIN street_scores ss ON ss.segment_id = rs.id
+        WHERE rs.road_class = %s
+          AND ST_DWithin(rs.geometry::geography, ST_MakePoint(%s, %s)::geography, %s)
+          AND ss.composite_score IS NOT NULL
+    """, [score, road_class, lng, lat, radius_m])
     nb = cur.fetchone()
 
     cur.close()
