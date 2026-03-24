@@ -360,7 +360,7 @@
     function phrasing(pct) {
       return pct > 50 ? `busier than ${pct}%` : `quieter than ${100 - pct}%`;
     }
-    const nbLine = rel.nb_percentile != null && rel.nb_total >= 5
+    const nbLine = rel.nb_percentile != null && rel.nb_total >= 3
       ? `<div style="margin-top:6px;">Nearby: ${phrasing(rel.nb_percentile)} of ${classLabel} streets (${rel.nb_total} nearby streets)</div>`
       : "";
     return `
