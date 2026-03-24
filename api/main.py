@@ -256,20 +256,27 @@ def get_relative(
     """, [score, road_class])
     city = cur.fetchone()
 
-    # Neighbourhood: same-class segments within radius
+    # Neighbourhood: distinct street names within radius, avg score per street
     cur.execute("""
+        WITH streets AS (
+            SELECT
+                COALESCE(rs.name, rs.id::text) AS street_name,
+                AVG(ss.composite_score) AS avg_score
+            FROM road_segments rs
+            JOIN street_scores ss ON ss.segment_id = rs.id
+            WHERE rs.road_class = %s
+              AND ST_DWithin(rs.geometry::geography, ST_MakePoint(%s, %s)::geography, %s)
+              AND ss.composite_score IS NOT NULL
+            GROUP BY street_name
+        )
         SELECT
             ROUND(
-                (COUNT(*) FILTER (WHERE ss.composite_score <= %s))::numeric /
+                (COUNT(*) FILTER (WHERE avg_score <= %s))::numeric /
                 NULLIF(COUNT(*), 0) * 100
             )::int AS percentile,
             COUNT(*) AS total
-        FROM road_segments rs
-        JOIN street_scores ss ON ss.segment_id = rs.id
-        WHERE rs.road_class = %s
-          AND ST_DWithin(rs.geometry::geography, ST_MakePoint(%s, %s)::geography, %s)
-          AND ss.composite_score IS NOT NULL
-    """, [score, road_class, lng, lat, radius_m])
+        FROM streets
+    """, [road_class, lng, lat, radius_m, score])
     nb = cur.fetchone()
 
     cur.close()
