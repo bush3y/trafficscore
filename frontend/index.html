@@ -361,11 +361,11 @@
       return pct > 50 ? `busier than ${pct}%` : `quieter than ${100 - pct}%`;
     }
     const nbLine = rel.nb_percentile != null && rel.nb_total >= 5
-      ? `<div>Nearby: ${phrasing(rel.nb_percentile)} of ${classLabel} streets (${rel.nb_total} nearby)</div>`
+      ? `<div style="margin-top:6px;">Nearby: ${phrasing(rel.nb_percentile)} of ${classLabel} streets (${rel.nb_total} nearby)</div>`
       : "";
     return `
       <div style="margin-top:12px;padding:10px 12px;background:#f5f5f5;border-radius:8px;font-size:0.8rem;color:#444;">
-        <div style="font-weight:600;margin-bottom:5px;">Relative to similar streets</div>
+        <div style="font-weight:600;margin-bottom:8px;">Compared to similar streets</div>
         <div>Ottawa: ${phrasing(rel.city_percentile)} of ${classLabel} streets</div>
         ${nbLine}
       </div>`;
