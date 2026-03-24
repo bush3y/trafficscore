@@ -104,7 +104,9 @@ def node_arterial_names(node, G) -> set:
     names = set()
     for _, _, data in G.edges(node, data=True):
         if data.get("road_class") in ARTERIAL_CLASSES:
-            names.add(data.get("road_name"))  # None for unnamed roads
+            road_name = data.get("road_name")
+            if road_name is not None:
+                names.add(road_name)
     return names
 
 

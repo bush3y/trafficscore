@@ -269,7 +269,7 @@ def run():
     # Step 3: Safety scores
     # Count collisions within ~50m of each segment (last 5 years)
     # Normalise by segment length, then PERCENT_RANK
-    # Use geometry (degrees) for speed — 0.0005° ≈ 50m at 45°N
+    # Use geometry (degrees) for speed — 0.0003° ≈ 33m at 45°N
     # ------------------------------------------------------------------
     print("Step 3: Computing safety scores (collision density)...")
     cur.execute("""
@@ -359,7 +359,7 @@ def run():
             ts.volume_score,
             ts.speed_score,
             ss.safety_score,
-            ROUND((COALESCE(rs.cutthrough_risk, 0) * 100)::numeric, 1),
+            ROUND((rs.cutthrough_risk * 100)::numeric, 1),
             tr.trend_score,
             -- Weighted composite using only available components
             ROUND(((
