@@ -440,6 +440,7 @@
       ` : ""}
 
       <div style="margin-top:16px;font-size:0.75rem;color:#bbb;user-select:all;">ID: ${props.id}</div>
+      <button id="share-btn" onclick="copyShareLink()" style="margin-top:12px;width:100%;padding:8px;background:#f5f5f5;border:1px solid #e0e0e0;border-radius:6px;font-size:0.82rem;color:#555;cursor:pointer;">🔗 Copy link</button>
     `;
 
     openSidebar();
@@ -497,6 +498,25 @@
       .catch(err => console.error("Failed to load segments:", err));
   }
 
+  // Share / deep-link helpers
+  function setShareUrl(q, type) {
+    const url = new URL(window.location.href);
+    url.search = `?q=${encodeURIComponent(q)}&type=${type}`;
+    history.pushState(null, "", url.toString());
+  }
+
+  window.copyShareLink = function() {
+    const url = window.location.href;
+    const btn = document.getElementById("share-btn");
+    if (navigator.share) {
+      navigator.share({ title: "TrafficScore Ottawa", url }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(url).then(() => {
+        if (btn) { btn.textContent = "✓ Copied!"; setTimeout(() => btn.textContent = "🔗 Copy link", 2000); }
+      }).catch(() => {});
+    }
+  };
+
   // Search
   let searchLayer = null;
   let addressMarker = null;
@@ -543,6 +563,7 @@
           el.addEventListener("click", () => {
             const name = el.dataset.name;
             const feats = byName[name];
+            setShareUrl(name, "street");
 
             if (searchLayer) map.removeLayer(searchLayer);
             searchLayer = L.geoJSON({ type: "FeatureCollection", features: feats }, {
@@ -619,6 +640,7 @@ function addressMessage(score) {
 
       <div id="relative-row"></div>
       ${renderNeighbourhoodRow(neighbourhoodScore, neighbourhood)}
+      <button id="share-btn" onclick="copyShareLink()" style="margin-top:12px;width:100%;padding:8px;background:#f5f5f5;border:1px solid #e0e0e0;border-radius:6px;font-size:0.82rem;color:#555;cursor:pointer;">🔗 Copy link</button>
     `;
 
     openSidebar();
@@ -710,6 +732,7 @@ function addressMessage(score) {
                 .replace(/\b\w/g, c => c.toUpperCase());
             }
             renderAddressCard(nearest, shortName, neighbourhood, nbData.avg_score);
+            setShareUrl(q, "address");
 
             // Async relative stats
             const p = nearest.properties;
@@ -833,6 +856,20 @@ function addressMessage(score) {
 
   // Initial load
   loadSegments();
+
+  // Auto-trigger search from shared URL
+  (function() {
+    const params = new URLSearchParams(window.location.search);
+    const q = params.get("q");
+    const type = params.get("type");
+    if (!q) return;
+    document.getElementById("search-input").value = q;
+    if (type === "address" || looksLikeAddress(q)) {
+      doAddressSearch(q);
+    } else {
+      doStreetSearch(q);
+    }
+  })();
 </script>
 </body>
 </html>
