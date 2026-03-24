@@ -383,7 +383,15 @@
       </div>`;
   }
 
-  function renderSidebar(props) {
+  function segmentCentroid(geometry) {
+    if (!geometry) return null;
+    const coords = geometry.type === "LineString"
+      ? geometry.coordinates[Math.floor(geometry.coordinates.length / 2)]
+      : geometry.coordinates[0][0];
+    return { lat: coords[1], lng: coords[0] };
+  }
+
+  function renderSidebar(props, geometry = null) {
     const content = document.getElementById("sidebar-content");
     const composite = props.composite_score;
 
@@ -436,28 +444,24 @@
 
     openSidebar();
 
-    // Async neighbourhood score + name
-    fetch(`/api/segments/${props.id}`)
-      .then(r => r.json())
-      .then(seg => {
-        if (!seg.geometry) return;
-        const coords = seg.geometry.type === "LineString"
-          ? seg.geometry.coordinates[Math.floor(seg.geometry.coordinates.length / 2)]
-          : seg.geometry.coordinates[0][0];
-        const lat = coords[1], lng = coords[0];
-        return Promise.all([
-          fetch(`/api/neighbourhood?lat=${lat}&lng=${lng}`).then(r => r.json()),
-          fetch(`/api/reverse-geocode?lat=${lat}&lng=${lng}`).then(r => r.json()),
-          fetch(`/api/relative?road_class=${encodeURIComponent(props.road_class)}&score=${props.composite_score}&lat=${lat}&lng=${lng}`).then(r => r.json()).catch(() => null),
-        ]);
-      })
-      .then(([nb, geo, rel]) => {
-        const relEl = document.getElementById("relative-row");
-        if (relEl) relEl.innerHTML = renderRelativeRow(rel);
-        const el = document.getElementById("nb-row");
-        if (el && nb) el.innerHTML = renderNeighbourhoodRow(nb.avg_score, geo?.neighbourhood);
-      })
-      .catch(() => {});
+    // Async neighbourhood + relative scores
+    const centroid = segmentCentroid(geometry);
+    const centroidPromise = centroid
+      ? Promise.resolve(centroid)
+      : fetch(`/api/segments/${props.id}`).then(r => r.json()).then(seg => segmentCentroid(seg.geometry));
+
+    centroidPromise.then(({ lat, lng }) =>
+      Promise.all([
+        fetch(`/api/neighbourhood?lat=${lat}&lng=${lng}`).then(r => r.json()),
+        fetch(`/api/reverse-geocode?lat=${lat}&lng=${lng}`).then(r => r.json()),
+        fetch(`/api/relative?road_class=${encodeURIComponent(props.road_class)}&score=${props.composite_score}&lat=${lat}&lng=${lng}`).then(r => r.json()).catch(() => null),
+      ])
+    ).then(([nb, geo, rel]) => {
+      const relEl = document.getElementById("relative-row");
+      if (relEl) relEl.innerHTML = renderRelativeRow(rel);
+      const el = document.getElementById("nb-row");
+      if (el && nb) el.innerHTML = renderNeighbourhoodRow(nb.avg_score, geo?.neighbourhood);
+    }).catch(() => {});
   }
 
   function loadSegments() {
@@ -486,7 +490,7 @@
             opacity: segmentOpacity(feature.properties),
           }),
           onEachFeature: (feature, layer) => {
-            layer.on("click", () => renderSidebar(feature.properties));
+            layer.on("click", () => renderSidebar(feature.properties, feature.geometry));
           },
         }).addTo(map);
       })
@@ -548,12 +552,12 @@
                 opacity: segmentOpacity(f.properties),
               }),
               onEachFeature: (feature, layer) => {
-                layer.on("click", () => renderSidebar(feature.properties));
+                layer.on("click", () => renderSidebar(feature.properties, feature.geometry));
               },
             }).addTo(map);
 
             map.setView(searchLayer.getBounds().getCenter(), 17);
-            renderSidebar(feats[0].properties);
+            renderSidebar(feats[0].properties, feats[0].geometry);
           });
         });
 
@@ -695,7 +699,7 @@ function addressMessage(score) {
                 opacity: segmentOpacity(f.properties),
               }),
               onEachFeature: (feature, layer) => {
-                layer.on("click", () => renderSidebar(feature.properties));
+                layer.on("click", () => renderSidebar(feature.properties, feature.geometry));
               },
             }).addTo(map);
 
@@ -759,7 +763,7 @@ function addressMessage(score) {
               resultsEl.querySelectorAll(".search-result-item").forEach(el => {
                 el.addEventListener("click", () => {
                   const feats = byName[el.dataset.name];
-                  renderSidebar(feats[0].properties);
+                  renderSidebar(feats[0].properties, feats[0].geometry);
                 });
               });
             }
