@@ -353,6 +353,24 @@
     document.body.classList.remove("sidebar-peek", "sidebar-open");
   }
 
+  function renderRelativeRow(rel) {
+    if (!rel || rel.city_percentile == null) return "";
+    const classLabel = ["unclassified", "living_street"].includes(rel.road_class)
+      ? "residential" : rel.road_class;
+    function phrasing(pct) {
+      return pct > 50 ? `busier than ${pct}%` : `quieter than ${100 - pct}%`;
+    }
+    const nbLine = rel.nb_percentile != null && rel.nb_total >= 5
+      ? `<div>Nearby: ${phrasing(rel.nb_percentile)} of ${classLabel} streets (${rel.nb_total} nearby)</div>`
+      : "";
+    return `
+      <div style="margin-top:12px;padding:10px 12px;background:#f5f5f5;border-radius:8px;font-size:0.8rem;color:#444;">
+        <div style="font-weight:600;margin-bottom:5px;">Relative to similar streets</div>
+        <div>Ottawa: ${phrasing(rel.city_percentile)} of ${classLabel} streets</div>
+        ${nbLine}
+      </div>`;
+  }
+
   function renderNeighbourhoodRow(score, name) {
     if (score == null) return "";
     const color = scoreColor(score);
@@ -403,6 +421,7 @@
         </div>
       `).join("")}
 
+      <div id="relative-row"></div>
       <div id="nb-row"></div>
 
       ${props.cutthrough_risk != null ? `
@@ -429,9 +448,12 @@
         return Promise.all([
           fetch(`/api/neighbourhood?lat=${lat}&lng=${lng}`).then(r => r.json()),
           fetch(`/api/reverse-geocode?lat=${lat}&lng=${lng}`).then(r => r.json()),
+          fetch(`/api/segments/${props.id}/relative?lat=${lat}&lng=${lng}`).then(r => r.json()),
         ]);
       })
-      .then(([nb, geo]) => {
+      .then(([nb, geo, rel]) => {
+        const relEl = document.getElementById("relative-row");
+        if (relEl) relEl.innerHTML = renderRelativeRow(rel);
         const el = document.getElementById("nb-row");
         if (el && nb) el.innerHTML = renderNeighbourhoodRow(nb.avg_score, geo?.neighbourhood);
       })
@@ -591,6 +613,7 @@ function addressMessage(score) {
         </div>
       `).join("")}
 
+      <div id="relative-row"></div>
       ${renderNeighbourhoodRow(neighbourhoodScore, neighbourhood)}
     `;
 
@@ -683,6 +706,14 @@ function addressMessage(score) {
                 .replace(/\b\w/g, c => c.toUpperCase());
             }
             renderAddressCard(nearest, shortName, neighbourhood, nbData.avg_score);
+
+            // Async relative stats
+            fetch(`/api/segments/${nearest.properties.id}/relative?lat=${lat}&lng=${lon}`)
+              .then(r => r.json())
+              .then(rel => {
+                const el = document.getElementById("relative-row");
+                if (el) el.innerHTML = renderRelativeRow(rel);
+              }).catch(() => {});
 
             // Show other nearby streets as a secondary list
             const byName = {};

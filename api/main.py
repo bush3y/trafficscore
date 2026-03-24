@@ -230,6 +230,76 @@ def get_segment(segment_id: int):
     }
 
 
+@app.get("/api/segments/{segment_id}/relative")
+def get_relative(
+    segment_id: int,
+    lat: float = Query(...),
+    lng: float = Query(...),
+    radius_m: int = Query(600),
+):
+    """Percentile rank within road class — city-wide and neighbourhood."""
+    conn = get_conn()
+    cur = conn.cursor()
+
+    # Get road class
+    cur.execute("""
+        SELECT rs.road_class FROM road_segments rs
+        JOIN street_scores ss ON ss.segment_id = rs.id
+        WHERE rs.id = %s AND ss.composite_score IS NOT NULL
+    """, [segment_id])
+    seg = cur.fetchone()
+    if not seg:
+        cur.close(); conn.close()
+        raise HTTPException(status_code=404, detail="Segment not found")
+
+    road_class = seg["road_class"]
+
+    # City-wide percentile within road class
+    cur.execute("""
+        WITH ranked AS (
+            SELECT rs.id,
+                ROUND(PERCENT_RANK() OVER (ORDER BY ss.composite_score) * 100)::int AS percentile,
+                COUNT(*) OVER () AS total
+            FROM road_segments rs
+            JOIN street_scores ss ON ss.segment_id = rs.id
+            WHERE rs.road_class = %s AND ss.composite_score IS NOT NULL
+        )
+        SELECT percentile, total FROM ranked WHERE id = %s
+    """, [road_class, segment_id])
+    city = cur.fetchone()
+
+    # Neighbourhood percentile within road class
+    cur.execute("""
+        WITH nb AS (
+            SELECT rs.id, ss.composite_score
+            FROM road_segments rs
+            JOIN street_scores ss ON ss.segment_id = rs.id
+            WHERE rs.road_class = %s
+              AND ST_DWithin(rs.geometry::geography, ST_MakePoint(%s, %s)::geography, %s)
+              AND ss.composite_score IS NOT NULL
+        ),
+        ranked AS (
+            SELECT id,
+                ROUND(PERCENT_RANK() OVER (ORDER BY composite_score) * 100)::int AS percentile,
+                COUNT(*) OVER () AS total
+            FROM nb
+        )
+        SELECT percentile, total FROM ranked WHERE id = %s
+    """, [road_class, lng, lat, radius_m, segment_id])
+    nb = cur.fetchone()
+
+    cur.close()
+    conn.close()
+
+    return {
+        "road_class": road_class,
+        "city_percentile": city["percentile"] if city else None,
+        "city_total": int(city["total"]) if city else None,
+        "nb_percentile": nb["percentile"] if nb else None,
+        "nb_total": int(nb["total"]) if nb else None,
+    }
+
+
 _ABBREVS = [
     (r"\bave\b",  "avenue"),
     (r"\bblvd\b", "boulevard"),
