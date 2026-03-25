@@ -68,22 +68,24 @@ def run():
             route_shapes[row["route_id"]].add(row["shape_id"])
     print(f"  {len(route_trips)} routes with weekday trips")
 
-    # Shapes: build LineString WKT per shape_id
-    print("Parsing shapes...")
+    # Shapes: only load shape_ids actually used by known routes (saves memory)
+    needed_shape_ids = {sid for sids in route_shapes.values() for sid in sids}
+    print(f"Parsing shapes ({len(needed_shape_ids)} needed)...")
     shape_points = defaultdict(list)  # shape_id → [(seq, lon, lat)]
     for row in read_csv(zf, "shapes.txt"):
-        shape_points[row["shape_id"]].append((
-            int(row["shape_pt_sequence"]),
-            float(row["shape_pt_lon"]),
-            float(row["shape_pt_lat"]),
-        ))
+        if row["shape_id"] in needed_shape_ids:
+            shape_points[row["shape_id"]].append((
+                int(row["shape_pt_sequence"]),
+                float(row["shape_pt_lon"]),
+                float(row["shape_pt_lat"]),
+            ))
 
     shape_wkt = {}
     for shape_id, pts in shape_points.items():
         pts.sort(key=lambda x: x[0])
         coords = ", ".join(f"{lon} {lat}" for _, lon, lat in pts)
         shape_wkt[shape_id] = f"LINESTRING({coords})"
-    print(f"  {len(shape_wkt)} shapes")
+    print(f"  {len(shape_wkt)} shapes loaded")
 
     # Load into DB
     print("Loading into database...")
