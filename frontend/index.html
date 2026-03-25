@@ -179,15 +179,15 @@
         display: block;
       }
 
-      /* Sidebar: bottom sheet, sizes to content */
+      /* Sidebar: bottom sheet, full height — only transform changes */
       #sidebar {
         top: auto;
         bottom: 0;
         left: 0;
         right: 0;
         width: 100%;
-        height: auto;
-        max-height: calc(100vh - 120px);
+        height: 100vh;
+        max-height: 100vh;
         border-radius: 16px 16px 0 0;
         box-shadow: 0 -2px 12px rgba(0,0,0,0.15);
         transform: translateY(100%);
@@ -200,7 +200,6 @@
       /* Expanded: full screen */
       #sidebar.open {
         transform: translateY(0);
-        max-height: 100vh;
         border-radius: 0;
       }
 
