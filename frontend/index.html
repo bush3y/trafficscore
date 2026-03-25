@@ -197,8 +197,12 @@
       /* Peek: shows handle + street name + score chip */
       #sidebar.peek { transform: translateY(calc(100% - 185px)); }
 
-      /* Expanded: content height, won't overlap controls */
-      #sidebar.open { transform: translateY(0); }
+      /* Expanded: full screen */
+      #sidebar.open {
+        transform: translateY(0);
+        max-height: 100vh;
+        border-radius: 0;
+      }
 
       /* Drag handle */
       #sidebar-handle {
