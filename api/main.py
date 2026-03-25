@@ -372,7 +372,9 @@ def reverse_geocode(lat: float = Query(...), lng: float = Query(...)):
     )
     data = resp.json()
     addr = data.get("address", {})
-    neighbourhood = addr.get("suburb") or addr.get("neighbourhood") or addr.get("quarter") or addr.get("city_district")
+    neighbourhood = (addr.get("suburb") or addr.get("neighbourhood") or
+                     addr.get("quarter") or addr.get("village") or
+                     addr.get("hamlet") or addr.get("city_district"))
     return {"neighbourhood": neighbourhood}
 
 
