@@ -65,6 +65,8 @@
       .then(r => r.json())
       .then(d => {
         const cmd = s => `<code style="font-size:0.78rem;background:#f5f5f5;padding:1px 5px;border-radius:3px;font-family:monospace;">${s}</code>`;
+        const autoDown = "Auto — downloads from source URL";
+        const manual = "Manual — SSH + run script";
 
         const cards = [
           card("Road Segments", [
