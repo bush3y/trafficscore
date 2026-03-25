@@ -165,20 +165,43 @@ def get_neighbourhood(
     lng: float = Query(...),
     radius_m: int = Query(600),
 ):
-    """Aggregate score for residential streets near a point."""
+    """Aggregate score for residential streets — uses neighbourhood polygon if available, else radius."""
     conn = get_conn()
     cur = conn.cursor()
 
+    # Try neighbourhood polygon first
     cur.execute("""
-        SELECT
-            ROUND(AVG(ss.composite_score)::numeric, 1) AS avg_score,
-            COUNT(*) AS num_segments
-        FROM road_segments rs
-        JOIN street_scores ss ON ss.segment_id = rs.id
-        WHERE rs.road_class IN ('residential', 'unclassified', 'living_street')
-          AND ST_DWithin(rs.geometry::geography, ST_MakePoint(%s, %s)::geography, %s)
-          AND ss.composite_score IS NOT NULL
-    """, [lng, lat, radius_m])
+        SELECT id FROM neighbourhoods
+        WHERE ST_Contains(geometry, ST_SetSRID(ST_MakePoint(%s, %s), 4326))
+        LIMIT 1
+    """, [lng, lat])
+    nb = cur.fetchone()
+
+    if nb:
+        cur.execute("""
+            SELECT
+                ROUND(AVG(ss.composite_score)::numeric, 1) AS avg_score,
+                COUNT(*) AS num_segments
+            FROM road_segments rs
+            JOIN street_scores ss ON ss.segment_id = rs.id
+            WHERE rs.road_class IN ('residential', 'unclassified', 'living_street')
+              AND ST_Contains(
+                    (SELECT geometry FROM neighbourhoods WHERE id = %s),
+                    ST_Centroid(rs.geometry)
+                  )
+              AND ss.composite_score IS NOT NULL
+        """, [nb["id"]])
+    else:
+        cur.execute("""
+            SELECT
+                ROUND(AVG(ss.composite_score)::numeric, 1) AS avg_score,
+                COUNT(*) AS num_segments
+            FROM road_segments rs
+            JOIN street_scores ss ON ss.segment_id = rs.id
+            WHERE rs.road_class IN ('residential', 'unclassified', 'living_street')
+              AND ST_DWithin(rs.geometry::geography, ST_MakePoint(%s, %s)::geography, %s)
+              AND ss.composite_score IS NOT NULL
+        """, [lng, lat, radius_m])
 
     row = cur.fetchone()
     cur.close()
@@ -363,7 +386,22 @@ def search_streets(name: str = Query(..., min_length=2)):
 
 @app.get("/api/reverse-geocode")
 def reverse_geocode(lat: float = Query(...), lng: float = Query(...)):
-    """Proxy Nominatim reverse geocoding — returns suburb/neighbourhood name."""
+    """Returns neighbourhood name — DB polygon lookup first, Nominatim fallback."""
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT name FROM neighbourhoods
+        WHERE ST_Contains(geometry, ST_SetSRID(ST_MakePoint(%s, %s), 4326))
+        LIMIT 1
+    """, [lng, lat])
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+
+    if row:
+        return {"neighbourhood": row["name"]}
+
+    # Fall back to Nominatim for areas outside ONS boundaries (rural Ottawa)
     resp = http_requests.get(
         "https://nominatim.openstreetmap.org/reverse",
         params={"lat": lat, "lon": lng, "format": "json"},

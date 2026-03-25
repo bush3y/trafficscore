@@ -93,6 +93,16 @@ CREATE INDEX IF NOT EXISTS collisions_geom_idx ON collisions USING GIST(geometry
 CREATE INDEX IF NOT EXISTS collisions_year_idx ON collisions(year);
 
 -- ============================================================
+-- Ottawa neighbourhood boundaries (Ottawa Open Data — ONS Gen 3)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS neighbourhoods (
+    id       SERIAL PRIMARY KEY,
+    name     TEXT NOT NULL,
+    geometry GEOMETRY(MultiPolygon, 4326) NOT NULL
+);
+CREATE INDEX IF NOT EXISTS neighbourhoods_geom_idx ON neighbourhoods USING GIST(geometry);
+
+-- ============================================================
 -- Computed street scores (cached, refreshed on schedule)
 -- Lower composite_score = more desirable (quieter, safer, stable)
 -- ============================================================
