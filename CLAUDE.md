@@ -112,16 +112,23 @@ uvicorn api.main:app --reload   # API at localhost:8000
 
 ## Pending / Future Ideas
 - **Neighbourhood browse**: search by neighbourhood name ("Westboro") and get aggregate score card
-- **Share/deep links**: URLs that open map at a specific street or address
 - **TomTom refresh**: trial was August 2024 only. Paid plan would allow monthly/quarterly refresh. HERE Traffic Analytics is an alternative but requires new ingestion script + segment matching logic.
 - Re-evaluate trend score weight (currently stored but not used in composite)
 - Broader calibration pass across more streets/neighbourhoods
 
 ## Ingestion Scripts
 ```bash
-python -m ingestion.osm_ingest          # Fetch OSM road network
-python -m ingestion.tomtom_ingest       # Load TomTom data (default: Aug 2024 trial range)
-python -m ingestion.ottawa_collisions   # Load collision data
-python -m scoring.cutthrough            # Compute cut-through risk scores
-python -m scoring.scorer                # Run full scoring pipeline
+python -m ingestion.osm_ingest                           # Fetch OSM road network
+python -m ingestion.tomtom_ingest                        # Load TomTom data (default: Aug 2024 trial range)
+python -m ingestion.ottawa_collisions --dir ./data/collisions  # Load collision CSVs
+python -m ingestion.ottawa_volumes --dir ./data/volumes  # Load intersection volume CSVs
+python -m ingestion.ottawa_neighbourhoods                # Download + load ONS neighbourhood boundaries
+python -m scoring.cutthrough                             # Compute cut-through risk scores
+python -m scoring.scorer                                 # Run full scoring pipeline
 ```
+
+**IMPORTANT — keep this section up to date.** The admin page at `/admin` reflects these scripts
+and data sources. When adding a new data source or ingestion script, update:
+1. This section in CLAUDE.md
+2. `/api/admin/status` endpoint in `api/main.py` (add the relevant DB query)
+3. The cards in `frontend/admin.html` (add records, coverage, last updated, update method, script)
