@@ -64,41 +64,50 @@
     fetch("/api/admin/status")
       .then(r => r.json())
       .then(d => {
+        const manual = "Manual — SSH + run ingestion script";
+        const autoDown = "Auto — downloads from source URL";
+
         const cards = [
           card("Road Segments", [
             ["Records",      num(d.road_segments.count)],
             ["Coverage",     "Ottawa region (OSM)"],
             ["Last updated", '<span class="dim">—</span>'],
+            ["Updates",      manual],
           ], { label: "OpenStreetMap", url: "https://www.openstreetmap.org" }),
 
           card("TomTom Traffic Data", [
             ["Records",      num(d.tomtom.count)],
             ["Coverage",     d.tomtom.date_from ? `${date(d.tomtom.date_from)} → ${date(d.tomtom.date_to)}` : '<span class="dim">—</span>'],
             ["Last updated", date(d.tomtom.last_pulled)],
+            ["Updates",      "Manual — requires paid API key"],
           ], { label: "TomTom Traffic Stats API", url: "https://developer.tomtom.com/traffic-stats/documentation/product-information/introduction" }),
 
           card("Collision Records", [
             ["Records",      num(d.collisions.count)],
             ["Coverage",     d.collisions.year_from ? `${d.collisions.year_from} – ${d.collisions.year_to}` : '<span class="dim">—</span>'],
             ["Last updated", '<span class="dim">—</span>'],
+            ["Updates",      "Manual — download CSV from source, then run script"],
           ], { label: "Ottawa Open Data", url: "https://open.ottawa.ca/search?q=traffic+collision" }),
 
           card("Intersection Volumes", [
             ["Records",      num(d.intersection_volumes.count)],
             ["Coverage",     d.intersection_volumes.year_from ? `${d.intersection_volumes.year_from} – ${d.intersection_volumes.year_to}` : '<span class="dim">—</span>'],
             ["Last updated", '<span class="dim">—</span>'],
+            ["Updates",      "Manual — download CSV from source, then run script"],
           ], { label: "Ottawa Open Data", url: "https://open.ottawa.ca/search?q=intersection+volume" }),
 
           card("Street Scores", [
             ["Segments scored", num(d.scores.scored)],
             ["Total segments",  num(d.scores.total)],
             ["Last computed",   date(d.scores.last_computed)],
+            ["Updates",         "Manual — re-run after any data change"],
           ], null),
 
           card("Neighbourhood Boundaries", [
             ["Neighbourhoods", num(d.neighbourhoods.count)],
             ["Coverage",       "Ottawa ONS Gen 3"],
             ["Last updated",   '<span class="dim">—</span>'],
+            ["Updates",        autoDown],
           ], { label: "Ottawa Open Data — ONS Gen 3", url: "https://open.ottawa.ca/datasets/ottawa::ottawa-neighbourhood-study-ons-neighbourhood-boundaries-gen-3/about" }),
         ];
 
