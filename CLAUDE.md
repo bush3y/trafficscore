@@ -123,6 +123,7 @@ python -m ingestion.tomtom_ingest                        # Load TomTom data (def
 python -m ingestion.ottawa_collisions --dir ./data/collisions  # Load collision CSVs
 python -m ingestion.ottawa_volumes --dir ./data/volumes  # Load intersection volume CSVs
 python -m ingestion.ottawa_neighbourhoods                # Download + load ONS neighbourhood boundaries
+python -m ingestion.octranspo_gtfs                       # Download + load OC Transpo bus routes (GTFS)
 python -m scoring.cutthrough                             # Compute cut-through risk scores
 python -m scoring.scorer                                 # Run full scoring pipeline
 ```

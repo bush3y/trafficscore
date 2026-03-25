@@ -16,6 +16,7 @@ import requests as http_requests
 from psycopg2.extras import RealDictCursor
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 
@@ -433,6 +434,27 @@ def geocode(q: str = Query(..., min_length=3)):
     return resp.json()
 
 
+@app.get("/api/bus-routes")
+def get_bus_routes(lat: float = Query(...), lng: float = Query(...)):
+    """Bus routes passing within ~30m of a point, ordered by frequency."""
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT route_id, route_name, weekday_trips
+        FROM bus_routes
+        WHERE ST_DWithin(
+            geometry::geography,
+            ST_SetSRID(ST_MakePoint(%s, %s), 4326)::geography,
+            30
+        )
+        ORDER BY weekday_trips DESC
+    """, [lng, lat])
+    rows = [dict(r) for r in cur.fetchall()]
+    cur.close()
+    conn.close()
+    return {"routes": rows}
+
+
 @app.get("/api/admin/status")
 def admin_status():
     """Data freshness stats for the admin dashboard."""
@@ -478,6 +500,13 @@ def admin_status():
     cur.execute("SELECT COUNT(*) AS count FROM neighbourhoods")
     neighbourhoods = dict(cur.fetchone())
 
+    cur.execute("""
+        SELECT COUNT(*) AS count,
+               MAX(fetched_at)::text AS last_fetched
+        FROM bus_routes
+    """)
+    bus_routes = dict(cur.fetchone())
+
     cur.close()
     conn.close()
 
@@ -488,7 +517,13 @@ def admin_status():
         "intersection_volumes": intersection_volumes,
         "scores": scores,
         "neighbourhoods": neighbourhoods,
+        "bus_routes": bus_routes,
     }
+
+
+@app.get("/admin")
+def admin_page():
+    return FileResponse("frontend/admin.html")
 
 
 # Serve frontend

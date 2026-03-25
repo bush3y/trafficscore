@@ -93,6 +93,18 @@ CREATE INDEX IF NOT EXISTS collisions_geom_idx ON collisions USING GIST(geometry
 CREATE INDEX IF NOT EXISTS collisions_year_idx ON collisions(year);
 
 -- ============================================================
+-- OC Transpo bus routes (auto-downloaded from GTFS feed)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS bus_routes (
+    route_id      TEXT PRIMARY KEY,
+    route_name    TEXT NOT NULL,   -- short name, e.g. "85", "270"
+    weekday_trips INTEGER DEFAULT 0,
+    fetched_at    TIMESTAMPTZ DEFAULT NOW(),
+    geometry      GEOMETRY(MultiLineString, 4326)
+);
+CREATE INDEX IF NOT EXISTS bus_routes_geom_idx ON bus_routes USING GIST(geometry);
+
+-- ============================================================
 -- Ottawa neighbourhood boundaries (Ottawa Open Data — ONS Gen 3)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS neighbourhoods (

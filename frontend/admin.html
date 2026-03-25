@@ -107,6 +107,14 @@
             ["Scripts",         cmd("python -m scoring.cutthrough") + "<br>" + cmd("python -m scoring.scorer")],
           ], null),
 
+          card("OC Transpo Bus Routes", [
+            ["Routes",       num(d.bus_routes.count)],
+            ["Coverage",     "Ottawa transit network"],
+            ["Last updated", date(d.bus_routes.last_fetched)],
+            ["Updates",      autoDown],
+            ["Script",       cmd("python -m ingestion.octranspo_gtfs")],
+          ], { label: "OC Transpo GTFS", url: "https://www.octranspo.com/en/plan-your-trip/travel-tools/developers/" }),
+
           card("Neighbourhood Boundaries", [
             ["Neighbourhoods", num(d.neighbourhoods.count)],
             ["Coverage",       "Ottawa ONS Gen 3"],
