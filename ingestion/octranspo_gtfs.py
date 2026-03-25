@@ -37,6 +37,13 @@ def read_csv(zf, filename):
         return list(reader)
 
 
+def stream_csv(zf, filename):
+    """Stream a CSV file from the GTFS zip one row at a time (memory-efficient)."""
+    with zf.open(filename) as f:
+        reader = csv.DictReader(io.TextIOWrapper(f, encoding="utf-8-sig"))
+        yield from reader
+
+
 def run():
     print("Downloading OC Transpo GTFS feed...")
     resp = requests.get(GTFS_URL, timeout=60)
@@ -68,23 +75,34 @@ def run():
             route_shapes[row["route_id"]].add(row["shape_id"])
     print(f"  {len(route_trips)} routes with weekday trips")
 
-    # Shapes: only load shape_ids actually used by known routes (saves memory)
+    # Shapes: stream row by row, keep only one shape's points in memory at a time.
+    # GTFS shapes.txt is typically sorted by shape_id + sequence, so we can
+    # process each shape and convert to WKT as soon as we see the next shape_id.
     needed_shape_ids = {sid for sids in route_shapes.values() for sid in sids}
-    print(f"Parsing shapes ({len(needed_shape_ids)} needed)...")
-    shape_points = defaultdict(list)  # shape_id → [(seq, lon, lat)]
-    for row in read_csv(zf, "shapes.txt"):
-        if row["shape_id"] in needed_shape_ids:
-            shape_points[row["shape_id"]].append((
+    print(f"Parsing shapes ({len(needed_shape_ids)} needed, streaming)...")
+    shape_wkt = {}
+    current_id = None
+    current_pts = []
+
+    def flush_shape():
+        if current_id and current_id in needed_shape_ids and current_pts:
+            current_pts.sort(key=lambda x: x[0])
+            coords = ", ".join(f"{lon} {lat}" for _, lon, lat in current_pts)
+            shape_wkt[current_id] = f"LINESTRING({coords})"
+
+    for row in stream_csv(zf, "shapes.txt"):
+        sid = row["shape_id"]
+        if sid != current_id:
+            flush_shape()
+            current_id = sid
+            current_pts = []
+        if sid in needed_shape_ids:
+            current_pts.append((
                 int(row["shape_pt_sequence"]),
                 float(row["shape_pt_lon"]),
                 float(row["shape_pt_lat"]),
             ))
-
-    shape_wkt = {}
-    for shape_id, pts in shape_points.items():
-        pts.sort(key=lambda x: x[0])
-        coords = ", ".join(f"{lon} {lat}" for _, lon, lat in pts)
-        shape_wkt[shape_id] = f"LINESTRING({coords})"
+    flush_shape()
     print(f"  {len(shape_wkt)} shapes loaded")
 
     # Load into DB
