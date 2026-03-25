@@ -11,5 +11,6 @@ COPY api/ ./api/
 COPY frontend/ ./frontend/
 COPY ingestion/ ./ingestion/
 COPY scoring/ ./scoring/
+COPY scripts/ ./scripts/
 
 CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
