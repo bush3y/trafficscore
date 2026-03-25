@@ -433,5 +433,63 @@ def geocode(q: str = Query(..., min_length=3)):
     return resp.json()
 
 
+@app.get("/api/admin/status")
+def admin_status():
+    """Data freshness stats for the admin dashboard."""
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("SELECT COUNT(*) AS count FROM road_segments")
+    road_segments = dict(cur.fetchone())
+
+    cur.execute("""
+        SELECT COUNT(*) AS count,
+               MIN(date_from)::text AS date_from,
+               MAX(date_to)::text   AS date_to,
+               MAX(pulled_at)::text AS last_pulled
+        FROM tomtom_segments
+    """)
+    tomtom = dict(cur.fetchone())
+
+    cur.execute("""
+        SELECT COUNT(*) AS count,
+               MIN(year) AS year_from,
+               MAX(year) AS year_to
+        FROM collisions
+    """)
+    collisions = dict(cur.fetchone())
+
+    cur.execute("""
+        SELECT COUNT(*) AS count,
+               MIN(year) AS year_from,
+               MAX(year) AS year_to
+        FROM intersection_volumes
+    """)
+    intersection_volumes = dict(cur.fetchone())
+
+    cur.execute("""
+        SELECT COUNT(*) AS total,
+               COUNT(composite_score) AS scored,
+               MAX(computed_at)::text AS last_computed
+        FROM street_scores
+    """)
+    scores = dict(cur.fetchone())
+
+    cur.execute("SELECT COUNT(*) AS count FROM neighbourhoods")
+    neighbourhoods = dict(cur.fetchone())
+
+    cur.close()
+    conn.close()
+
+    return {
+        "road_segments": road_segments,
+        "tomtom": tomtom,
+        "collisions": collisions,
+        "intersection_volumes": intersection_volumes,
+        "scores": scores,
+        "neighbourhoods": neighbourhoods,
+    }
+
+
 # Serve frontend
 app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")

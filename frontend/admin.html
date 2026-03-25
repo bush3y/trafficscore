@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TrafficScore — Admin</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f5f5; color: #222; padding: 32px 24px; }
+    h1 { font-size: 1.2rem; font-weight: 700; margin-bottom: 4px; }
+    .subtitle { font-size: 0.85rem; color: #888; margin-bottom: 32px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+    .card {
+      background: white; border-radius: 10px; padding: 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    .card h2 { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-bottom: 12px; }
+    .stat { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; font-size: 0.88rem; }
+    .stat .label { color: #555; }
+    .stat .value { font-weight: 600; color: #111; }
+    .stat .value.dim { color: #aaa; font-weight: 400; }
+    .refresh { margin-top: 32px; font-size: 0.78rem; color: #aaa; }
+    .loading { color: #aaa; font-size: 0.88rem; }
+    .error { color: #ef4444; font-size: 0.88rem; }
+  </style>
+</head>
+<body>
+  <h1>TrafficScore Ottawa — Data Status</h1>
+  <div class="subtitle">Read-only view of data freshness. Refresh by re-running ingestion scripts on the server.</div>
+
+  <div class="grid" id="grid">
+    <div class="loading">Loading…</div>
+  </div>
+  <div class="refresh" id="refresh-time"></div>
+
+  <script>
+    function fmt(val) {
+      if (val === null || val === undefined) return '<span class="dim">—</span>';
+      return val;
+    }
+
+    function fmtNum(n) {
+      if (n === null || n === undefined) return '<span class="dim">—</span>';
+      return Number(n).toLocaleString();
+    }
+
+    function fmtDate(s) {
+      if (!s) return '<span class="dim">—</span>';
+      return s.slice(0, 10);
+    }
+
+    function card(title, rows) {
+      return `
+        <div class="card">
+          <h2>${title}</h2>
+          ${rows.map(([label, value]) => `
+            <div class="stat">
+              <span class="label">${label}</span>
+              <span class="value">${value}</span>
+            </div>
+          `).join("")}
+        </div>`;
+    }
+
+    fetch("/api/admin/status")
+      .then(r => r.json())
+      .then(d => {
+        const cards = [
+          card("Road Segments (OSM)", [
+            ["Segments", fmtNum(d.road_segments.count)],
+          ]),
+          card("TomTom Traffic Data", [
+            ["Segments", fmtNum(d.tomtom.count)],
+            ["Coverage", d.tomtom.date_from ? `${fmtDate(d.tomtom.date_from)} → ${fmtDate(d.tomtom.date_to)}` : '<span class="dim">—</span>'],
+            ["Last pulled", fmtDate(d.tomtom.last_pulled)],
+          ]),
+          card("Collisions (Ottawa Open Data)", [
+            ["Records", fmtNum(d.collisions.count)],
+            ["Years", d.collisions.year_from ? `${d.collisions.year_from} – ${d.collisions.year_to}` : '<span class="dim">—</span>'],
+          ]),
+          card("Intersection Volumes", [
+            ["Records", fmtNum(d.intersection_volumes.count)],
+            ["Years", d.intersection_volumes.year_from ? `${d.intersection_volumes.year_from} – ${d.intersection_volumes.year_to}` : '<span class="dim">—</span>'],
+          ]),
+          card("Street Scores", [
+            ["Total segments", fmtNum(d.scores.total)],
+            ["With composite score", fmtNum(d.scores.scored)],
+            ["Last computed", fmtDate(d.scores.last_computed)],
+          ]),
+          card("Neighbourhood Boundaries (ONS)", [
+            ["Neighbourhoods", fmtNum(d.neighbourhoods.count)],
+          ]),
+        ];
+
+        document.getElementById("grid").innerHTML = cards.join("");
+        document.getElementById("refresh-time").textContent =
+          `Loaded at ${new Date().toLocaleTimeString()}`;
+      })
+      .catch(() => {
+        document.getElementById("grid").innerHTML = '<div class="error">Failed to load status — is the API running?</div>';
+      });
+  </script>
+</body>
+</html>
