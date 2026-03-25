@@ -440,13 +440,14 @@ def get_bus_routes(lat: float = Query(...), lng: float = Query(...)):
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("""
-        SELECT route_id, route_name, weekday_trips
+        SELECT route_name, SUM(weekday_trips) AS weekday_trips
         FROM bus_routes
         WHERE ST_DWithin(
             geometry::geography,
             ST_SetSRID(ST_MakePoint(%s, %s), 4326)::geography,
             30
         )
+        GROUP BY route_name
         ORDER BY weekday_trips DESC
     """, [lng, lat])
     rows = [dict(r) for r in cur.fetchall()]

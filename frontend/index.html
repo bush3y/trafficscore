@@ -390,8 +390,6 @@
 
   function renderBusRoutesRow(routes) {
     if (!routes || !routes.length) return "";
-    const seen = new Set();
-    routes = routes.filter(r => seen.has(r.route_name) ? false : seen.add(r.route_name));
     const names = routes.map(r => r.route_name).join(", ");
     const totalTrips = routes.reduce((s, r) => s + (r.weekday_trips || 0), 0);
     // Approximate avg headway across all routes over an 18-hour service day
