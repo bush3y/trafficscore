@@ -65,7 +65,7 @@ def fetch_osm():
 
     north, south, east, west = OTTAWA_BBOX
     G = ox.graph_from_bbox(
-        bbox=(north, south, east, west),
+        bbox=(west, south, east, north),  # osmnx 2.x: (left, bottom, right, top)
         network_type="drive",
         custom_filter=custom_filter,
         retain_all=True,
