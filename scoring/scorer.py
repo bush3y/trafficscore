@@ -280,35 +280,51 @@ def run():
 
     # ------------------------------------------------------------------
     # Step 3: Safety scores
-    # Each collision is attributed only to its nearest road segment —
-    # prevents highway/arterial collisions bleeding into adjacent residential
-    # streets (e.g. 417 onramp collisions counting against a nearby dead end).
-    # Normalise by segment length, then PERCENT_RANK.
+    # Two-step attribution:
+    #   1. Each collision is anchored to its nearest road segment — this
+    #      determines the road NAME it belongs to, preventing cross-road
+    #      spillover (e.g. 417 collisions claiming adjacent Melrose Ave).
+    #   2. The collision then counts for ALL same-named segments within 33m —
+    #      so a collision at an intersection benefits the whole Churchill Ave
+    #      block, not just the single nearest segment node.
     # ------------------------------------------------------------------
     print("Step 3: Computing safety scores (collision density)...")
     cur.execute("""
         CREATE TEMP TABLE safety_scores AS
         WITH nearest_segment AS (
-            -- Assign each collision to its single nearest road segment within 15m.
-            -- 15m captures on-road collisions but excludes motorway/highway spillover
-            -- onto adjacent residential streets (motorways are not in road_segments,
-            -- so without a tight radius those collisions would claim the nearest
-            -- residential segment instead).
+            -- Step 1: anchor each collision to its nearest segment within 15m.
+            -- Determines road name; prevents cross-road spillover.
             SELECT DISTINCT ON (c.id)
-                c.id AS collision_id,
-                rs.id AS segment_id
+                c.id         AS collision_id,
+                rs.id        AS nearest_id,
+                rs.name      AS nearest_name,
+                c.geometry   AS collision_geom
             FROM collisions c
             JOIN road_segments rs ON ST_DWithin(rs.geometry, c.geometry, 0.000135)
             WHERE c.year >= 2019
             ORDER BY c.id, c.geometry <-> rs.geometry
         ),
+        attributed_collisions AS (
+            -- Step 2: spread each collision to same-named segments within 33m.
+            -- Always includes the directly nearest segment (handles unnamed roads).
+            SELECT DISTINCT rs.id AS segment_id, n.collision_id
+            FROM nearest_segment n
+            JOIN road_segments rs ON (
+                rs.id = n.nearest_id
+                OR (
+                    rs.name = n.nearest_name
+                    AND n.nearest_name IS NOT NULL
+                    AND ST_DWithin(rs.geometry, n.collision_geom, 0.0003)
+                )
+            )
+        ),
         collision_counts AS (
             SELECT
                 rs.id AS segment_id,
-                COUNT(n.collision_id) AS num_collisions,
+                COUNT(DISTINCT ac.collision_id) AS num_collisions,
                 GREATEST(ST_Length(rs.geometry::geography) / 1000.0, 0.05) AS length_km
             FROM road_segments rs
-            LEFT JOIN nearest_segment n ON n.segment_id = rs.id
+            LEFT JOIN attributed_collisions ac ON ac.segment_id = rs.id
             GROUP BY rs.id
         )
         SELECT
