@@ -503,7 +503,9 @@ def admin_status():
 
     cur.execute("""
         SELECT COUNT(*) AS count,
-               MAX(fetched_at)::text AS last_fetched
+               MAX(fetched_at)::text AS last_fetched,
+               MIN(schedule_start)::text AS schedule_start,
+               MAX(schedule_end)::text AS schedule_end
         FROM bus_routes
     """)
     bus_routes = dict(cur.fetchone())

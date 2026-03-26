@@ -63,11 +63,18 @@ def run():
     print("Parsing calendar...")
     today = date.today().strftime("%Y%m%d")
     weekday_services = set()
+    schedule_start = None
+    schedule_end = None
     for row in read_csv(zf, "calendar.txt"):
         if (row.get("monday") == "1"
                 and row["start_date"] <= today <= row["end_date"]):
             weekday_services.add(row["service_id"])
+            if schedule_start is None or row["start_date"] < schedule_start:
+                schedule_start = row["start_date"]
+            if schedule_end is None or row["end_date"] > schedule_end:
+                schedule_end = row["end_date"]
     print(f"  {len(weekday_services)} active weekday service IDs (as of {today})")
+    print(f"  Schedule period: {schedule_start} – {schedule_end}")
 
     # Trips: count weekday trips per route, collect shape IDs
     print("Parsing trips...")
@@ -132,14 +139,16 @@ def run():
         multi_wkt = f"MULTILINESTRING({inner})"
 
         cur.execute("""
-            INSERT INTO bus_routes (route_id, route_name, weekday_trips, geometry)
-            VALUES (%s, %s, %s, ST_SetSRID(ST_GeomFromText(%s), 4326))
+            INSERT INTO bus_routes (route_id, route_name, weekday_trips, schedule_start, schedule_end, geometry)
+            VALUES (%s, %s, %s, %s, %s, ST_SetSRID(ST_GeomFromText(%s), 4326))
             ON CONFLICT (route_id) DO UPDATE SET
-                route_name    = EXCLUDED.route_name,
-                weekday_trips = EXCLUDED.weekday_trips,
-                geometry      = EXCLUDED.geometry,
-                fetched_at    = NOW()
-        """, [route_id, route_name, route_trips.get(route_id, 0), multi_wkt])
+                route_name     = EXCLUDED.route_name,
+                weekday_trips  = EXCLUDED.weekday_trips,
+                schedule_start = EXCLUDED.schedule_start,
+                schedule_end   = EXCLUDED.schedule_end,
+                geometry       = EXCLUDED.geometry,
+                fetched_at     = NOW()
+        """, [route_id, route_name, route_trips.get(route_id, 0), schedule_start, schedule_end, multi_wkt])
         inserted += 1
 
     conn.commit()

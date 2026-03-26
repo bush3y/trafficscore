@@ -31,6 +31,10 @@ MIGRATIONS = [
         );
         CREATE INDEX IF NOT EXISTS bus_routes_geom_idx ON bus_routes USING GIST(geometry);
     """),
+    ("bus_routes schedule columns", """
+        ALTER TABLE bus_routes ADD COLUMN IF NOT EXISTS schedule_start DATE;
+        ALTER TABLE bus_routes ADD COLUMN IF NOT EXISTS schedule_end   DATE;
+    """),
 ]
 
 
