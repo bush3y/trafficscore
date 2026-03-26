@@ -142,14 +142,16 @@ def run():
     """)
     cur.execute("CREATE INDEX ON tmp_direct_has_name (segment_id)")
 
-    # Segments with ANY direct TomTom match (even sparse/sub-threshold).
-    # These are excluded from spatial fallback — if TomTom data exists for the
-    # segment itself, using nearby road data would contaminate it (e.g. a quiet
-    # dead-end next to the 417 inheriting highway probe counts via spatial fallback).
+    # Segments with a usable direct TomTom match (probe_count >= 50).
+    # These are excluded from spatial fallback — if good TomTom data exists for
+    # the segment itself, using nearby road data would contaminate it.
+    # Using >= 50 (not ANY match) so segments with only sparse sub-threshold
+    # probes can still fall back to better nearby data rather than getting
+    # nothing at all.
     cur.execute("""
         CREATE TEMP TABLE tmp_has_direct_tomtom AS
         SELECT DISTINCT segment_id FROM tomtom_segments
-        WHERE segment_id IS NOT NULL AND time_set = 'all_day'
+        WHERE segment_id IS NOT NULL AND time_set = 'all_day' AND probe_count >= 50
     """)
     cur.execute("CREATE INDEX ON tmp_has_direct_tomtom (segment_id)")
 
