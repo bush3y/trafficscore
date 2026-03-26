@@ -276,12 +276,16 @@ def run():
     cur.execute("""
         CREATE TEMP TABLE safety_scores AS
         WITH nearest_segment AS (
-            -- Assign each collision to its single nearest road segment
+            -- Assign each collision to its single nearest road segment within 15m.
+            -- 15m captures on-road collisions but excludes motorway/highway spillover
+            -- onto adjacent residential streets (motorways are not in road_segments,
+            -- so without a tight radius those collisions would claim the nearest
+            -- residential segment instead).
             SELECT DISTINCT ON (c.id)
                 c.id AS collision_id,
                 rs.id AS segment_id
             FROM collisions c
-            JOIN road_segments rs ON ST_DWithin(rs.geometry, c.geometry, 0.0003)
+            JOIN road_segments rs ON ST_DWithin(rs.geometry::geography, c.geometry::geography, 15)
             WHERE c.year >= 2019
             ORDER BY c.id, c.geometry <-> rs.geometry
         ),
