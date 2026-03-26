@@ -312,13 +312,16 @@ def run():
             FROM nearest_segment n
             JOIN road_segments rs ON rs.id = n.nearest_id
             UNION
-            -- Path B: same-named segments within 33m
+            -- Path B: same-named segments within 150m.
+            -- 150m is wide enough to share collision clusters across a road's
+            -- adjacent blocks, while road-name anchoring still prevents
+            -- cross-street spillover (e.g. 417 collisions cannot reach Melrose Ave).
             SELECT rs.id AS segment_id, n.collision_id
             FROM nearest_segment n
             JOIN road_segments rs ON (
                 rs.name = n.nearest_name
                 AND n.nearest_name IS NOT NULL
-                AND ST_DWithin(rs.geometry, n.collision_geom, 0.0003)
+                AND ST_DWithin(rs.geometry, n.collision_geom, 0.00135)
             )
         ),
         collision_counts AS (
@@ -333,7 +336,9 @@ def run():
         SELECT
             segment_id,
             ROUND((PERCENT_RANK() OVER (
-                ORDER BY CASE WHEN num_collisions >= 3 THEN num_collisions ELSE 0 END / length_km
+                -- Threshold >=2: road-name attribution is now precise enough that
+                -- 2 collisions on the same named road is real signal, not noise.
+                ORDER BY CASE WHEN num_collisions >= 2 THEN num_collisions ELSE 0 END / length_km
             ) * 100)::numeric, 1) AS safety_score
         FROM collision_counts
     """)
