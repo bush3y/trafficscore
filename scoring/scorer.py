@@ -306,22 +306,25 @@ def run():
         ),
         attributed_collisions AS (
             -- Step 2: spread each collision to same-named segments within 33m.
-            -- Always includes the directly nearest segment (handles unnamed roads).
-            SELECT DISTINCT rs.id AS segment_id, n.collision_id
+            -- UNION (not OR) so each branch can use its own index.
+            -- Path A: always include the directly nearest segment (handles unnamed roads)
+            SELECT rs.id AS segment_id, n.collision_id
+            FROM nearest_segment n
+            JOIN road_segments rs ON rs.id = n.nearest_id
+            UNION
+            -- Path B: same-named segments within 33m
+            SELECT rs.id AS segment_id, n.collision_id
             FROM nearest_segment n
             JOIN road_segments rs ON (
-                rs.id = n.nearest_id
-                OR (
-                    rs.name = n.nearest_name
-                    AND n.nearest_name IS NOT NULL
-                    AND ST_DWithin(rs.geometry, n.collision_geom, 0.0003)
-                )
+                rs.name = n.nearest_name
+                AND n.nearest_name IS NOT NULL
+                AND ST_DWithin(rs.geometry, n.collision_geom, 0.0003)
             )
         ),
         collision_counts AS (
             SELECT
                 rs.id AS segment_id,
-                COUNT(DISTINCT ac.collision_id) AS num_collisions,
+                COUNT(ac.collision_id) AS num_collisions,
                 GREATEST(ST_Length(rs.geometry::geography) / 1000.0, 0.05) AS length_km
             FROM road_segments rs
             LEFT JOIN attributed_collisions ac ON ac.segment_id = rs.id
