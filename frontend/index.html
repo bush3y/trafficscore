@@ -392,8 +392,9 @@
     if (!routes || !routes.length) return "";
     const names = routes.map(r => r.route_name).join(", ");
     const totalTrips = routes.reduce((s, r) => s + (r.weekday_trips || 0), 0);
-    // Approximate avg headway across all routes over an 18-hour service day
-    const headway = totalTrips > 0 ? Math.round(routes.length * 18 * 60 / totalTrips) : null;
+    // GTFS trips count each direction separately — divide by 2 for per-direction headway.
+    // Approximate avg headway per direction over an 18-hour service day.
+    const headway = totalTrips > 0 ? Math.round(routes.length * 18 * 60 / (totalTrips / 2)) : null;
     const freqText = headway ? ` · ~every ${headway} min` : "";
     return `
       <div style="margin-top:12px;padding:10px 12px;background:#f5f5f5;border-radius:8px;font-size:0.82rem;color:#444;">
