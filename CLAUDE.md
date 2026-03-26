@@ -39,14 +39,14 @@ uvicorn api.main:app --reload   # API at localhost:8000
 |-------------|--------|-------|
 | Volume      | 45%    | TomTom probe count (PERCENT_RANK within all segments) |
 | Speed       | 15%    | Absolute p85 speed in km/h (not ratio — avoids penalizing 30 km/h zones) |
-| Safety      | 20%    | Collision density/km, ≥3 collisions to count, volume-discounted (see below) |
+| Safety      | 20%    | Collision density/km, ≥2 collisions to count, volume-discounted (see below) |
 | Cutthrough  | 20%    | Network graph analysis — only applies to residential/unclassified streets (NULL for arterials) |
 
 **Speed is absolute, not ratio**: a 30 km/h zone going 33 km/h was scoring 84th percentile under ratio approach — deliberate decision to use absolute.
 
 **Volume is NOT normalized by road class**: arterials score higher than residentials globally. This is intentional — a home buyer should see absolute quietness, not quietness relative to road type. The "Compared to similar streets" card section handles the relative comparison separately.
 
-**Safety volume-discount**: Safety contribution scaled by `LEAST(1.0, volume_score / 60.0)` — full weight only kicks in at the 60th percentile for volume. Prevents isolated fender-benders on quiet residential streets from dominating. Threshold is ≥3 collisions to filter out single minor incidents.
+**Safety volume-discount**: Safety contribution scaled by `LEAST(1.0, volume_score / 60.0)` — full weight only kicks in at the 60th percentile for volume. Prevents isolated fender-benders on quiet residential streets from dominating. Threshold is ≥2 collisions (lowered from 3 — road-name attribution is now precise enough that 2 collisions on the same named road is real signal).
 
 ## Score Categories (frontend)
 - **0–20**: Very quiet (green)
@@ -68,8 +68,13 @@ uvicorn api.main:app --reload   # API at localhost:8000
 - **Evered Avenue**: Residential, 30 km/h zone — scoring 34–46 (3 collisions at threshold)
 - **Canyon Walk Drive**: Wide spread (47–79) — top segment has 19 collisions near it, legitimate
 
-## Collision Search Radius
-`15m` (nearest-segment attribution) — each collision is attributed only to its nearest road segment within 15m. Motorways and trunk roads are now included in `road_segments` so highway collisions snap to the correct segment rather than bleeding onto adjacent residential streets.
+## Collision Attribution (scorer.py Step 3)
+Three-step process:
+1. **Anchor (15m)**: Each collision is assigned to its nearest road segment within 15m. This determines the road NAME — prevents cross-road spillover (e.g. 417 collisions cannot claim adjacent Melrose Ave).
+2. **Spread (150m)**: The collision then counts for ALL same-named segments within 150m of the anchor point. Ensures all blocks of Churchill Ave share the collision history from nearby intersections, not just the single nearest OSM node.
+3. **Smooth**: Any segment that still scores 0 after attribution inherits the average safety score of its non-zero same-named neighbours within 150m. Prevents adjacent segments on the same road from showing wildly different scores due to OSM node placement.
+
+Motorways and trunk roads are included in `road_segments` so highway collisions snap to the correct segment rather than bleeding onto adjacent residential streets.
 
 ## Known Issues / Design Decisions
 - Cutthrough score is NULL (not 0) for arterials so the composite formula excludes that component entirely for non-residential roads
@@ -102,13 +107,15 @@ uvicorn api.main:app --reload   # API at localhost:8000
 - **Geocode cache**: repeat address searches skip Nominatim round-trip (client-side Map)
 - **AbortController**: cancels in-flight requests on new search
 
-## Score Distribution (last checked)
+## Score Distribution (last checked — March 2026, includes motorways/trunk)
 | Band | Segments | % |
 |------|----------|---|
-| 0–20 Very quiet | 7,194 | 22% |
-| 20–35 Quiet | 8,480 | 26% |
-| 35–65 Moderate | 8,308 | 25% |
-| 65+ Busy | 8,774 | 27% |
+| 0–20 Very quiet | 16,771 | 36% |
+| 20–35 Quiet | 7,976 | 17% |
+| 35–65 Moderate | 11,663 | 25% |
+| 65+ Busy | 10,218 | 22% |
+
+Note: segment count increased from ~32k to ~46k after motorways/trunk added to OSM ingestion. The very-quiet band is larger because motorway-adjacent residential streets no longer inherit highway collision/volume data.
 
 ## Pending / Future Ideas
 - **Neighbourhood browse**: search by neighbourhood name ("Westboro") and get aggregate score card
@@ -126,6 +133,7 @@ python -m ingestion.ottawa_neighbourhoods                # Download + load ONS n
 python -m ingestion.octranspo_gtfs                       # Download + load OC Transpo bus routes (GTFS)
 python -m scoring.cutthrough                             # Compute cut-through risk scores
 python -m scoring.scorer                                 # Run full scoring pipeline
+# On server: docker compose build app && docker compose run --rm app python -m scoring.scorer
 ```
 
 **IMPORTANT — keep this section up to date.** The admin page at `/admin` reflects these scripts
