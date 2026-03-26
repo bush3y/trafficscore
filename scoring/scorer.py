@@ -267,22 +267,31 @@ def run():
 
     # ------------------------------------------------------------------
     # Step 3: Safety scores
-    # Count collisions within ~50m of each segment (last 5 years)
-    # Normalise by segment length, then PERCENT_RANK
-    # Use geometry (degrees) for speed — 0.0003° ≈ 33m at 45°N
+    # Each collision is attributed only to its nearest road segment —
+    # prevents highway/arterial collisions bleeding into adjacent residential
+    # streets (e.g. 417 onramp collisions counting against a nearby dead end).
+    # Normalise by segment length, then PERCENT_RANK.
     # ------------------------------------------------------------------
     print("Step 3: Computing safety scores (collision density)...")
     cur.execute("""
         CREATE TEMP TABLE safety_scores AS
-        WITH collision_counts AS (
+        WITH nearest_segment AS (
+            -- Assign each collision to its single nearest road segment
+            SELECT DISTINCT ON (c.id)
+                c.id AS collision_id,
+                rs.id AS segment_id
+            FROM collisions c
+            JOIN road_segments rs ON ST_DWithin(rs.geometry, c.geometry, 0.0003)
+            WHERE c.year >= 2019
+            ORDER BY c.id, c.geometry <-> rs.geometry
+        ),
+        collision_counts AS (
             SELECT
                 rs.id AS segment_id,
-                COUNT(c.id) AS num_collisions,
+                COUNT(n.collision_id) AS num_collisions,
                 GREATEST(ST_Length(rs.geometry::geography) / 1000.0, 0.05) AS length_km
             FROM road_segments rs
-            LEFT JOIN collisions c
-                ON ST_DWithin(rs.geometry, c.geometry, 0.0003)
-               AND c.year >= 2019
+            LEFT JOIN nearest_segment n ON n.segment_id = rs.id
             GROUP BY rs.id, rs.geometry
         )
         SELECT
