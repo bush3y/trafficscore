@@ -63,10 +63,9 @@ def fetch_osm():
         + '"]'
     )
 
-    # graph_from_place uses Ottawa's actual boundary polygon (more efficient
-    # than a large bounding box which includes lots of empty rural area)
-    G = ox.graph_from_place(
-        "Ottawa, Ontario, Canada",
+    north, south, east, west = OTTAWA_BBOX
+    G = ox.graph_from_bbox(
+        bbox=(north, south, east, west),
         network_type="drive",
         custom_filter=custom_filter,
         retain_all=True,
