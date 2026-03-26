@@ -4,8 +4,10 @@ OpenStreetMap road network ingestion for Ottawa.
 Uses osmnx (which handles Overpass API pagination/retries automatically)
 to fetch the Ottawa road network and load it into road_segments.
 
-Fetches: residential, tertiary, secondary, primary, unclassified roads.
-Excludes: motorways, highways, footpaths, cycleways.
+Fetches: all driveable road types including motorways and trunk roads.
+Motorways/trunk are included so that TomTom probe data and collision records
+from those roads snap to the correct segment rather than bleeding onto adjacent
+residential streets.
 
 Usage:
     python -m ingestion.osm_ingest
@@ -24,16 +26,23 @@ load_dotenv()
 
 DATABASE_URL = os.environ["DATABASE_URL"]
 
-# Road classes to include
+# Road classes to include.
+# Motorways and trunk roads are included so TomTom probe data and collision
+# records from those roads snap to the correct segment rather than bleeding
+# onto adjacent residential streets.
 TARGET_HIGHWAY_TYPES = [
-    "residential",
-    "tertiary",
-    "tertiary_link",
-    "secondary",
-    "secondary_link",
+    "motorway",
+    "motorway_link",
+    "trunk",
+    "trunk_link",
     "primary",
     "primary_link",
+    "secondary",
+    "secondary_link",
+    "tertiary",
+    "tertiary_link",
     "unclassified",
+    "residential",
     "living_street",
 ]
 

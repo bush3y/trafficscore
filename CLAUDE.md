@@ -69,7 +69,7 @@ uvicorn api.main:app --reload   # API at localhost:8000
 - **Canyon Walk Drive**: Wide spread (47–79) — top segment has 19 collisions near it, legitimate
 
 ## Collision Search Radius
-`15m` (geography) — tightened from 33m to prevent motorway/highway collision bleed onto adjacent residential streets. Motorways (417 etc.) are not in `road_segments`, so without a tight radius their collisions would claim the nearest residential segment instead.
+`15m` (nearest-segment attribution) — each collision is attributed only to its nearest road segment within 15m. Motorways and trunk roads are now included in `road_segments` so highway collisions snap to the correct segment rather than bleeding onto adjacent residential streets.
 
 ## Known Issues / Design Decisions
 - Cutthrough score is NULL (not 0) for arterials so the composite formula excludes that component entirely for non-residential roads
