@@ -348,30 +348,6 @@ def run():
     """)
     conn.commit()
 
-    # Smooth zero-safety segments by averaging non-zero same-named neighbours.
-    # Only segments scoring 0 are adjusted; non-zero scores are unchanged.
-    cur.execute("""
-        UPDATE safety_scores s
-        SET safety_score = neighbour_avg
-        FROM (
-            SELECT s2.segment_id,
-                   AVG(s3.safety_score) AS neighbour_avg
-            FROM safety_scores s2
-            JOIN road_segments rs2 ON rs2.id = s2.segment_id
-            JOIN road_segments rs3 ON (
-                rs3.name = rs2.name
-                AND rs3.name IS NOT NULL
-                AND rs3.id != rs2.id
-                AND ST_DWithin(rs2.geometry, rs3.geometry, 0.00135)
-            )
-            JOIN safety_scores s3 ON s3.segment_id = rs3.id AND s3.safety_score > 0
-            WHERE s2.safety_score = 0
-            GROUP BY s2.segment_id
-        ) smoothed
-        WHERE s.segment_id = smoothed.segment_id
-    """)
-    conn.commit()
-
     cur.execute("SELECT COUNT(*) FROM safety_scores")
     print(f"  {cur.fetchone()[0]:,} segments scored for safety")
 
@@ -476,6 +452,50 @@ def run():
     cur.execute("SELECT COUNT(*) FROM street_scores WHERE composite_score IS NOT NULL")
     scored = cur.fetchone()[0]
     print(f"  {scored:,} segments with composite scores written")
+
+    # ------------------------------------------------------------------
+    # Step 5b: Smooth zero-safety segments
+    # Segments that scored safety=0 after attribution inherit the average
+    # safety of their non-zero same-named neighbours within 150m, then
+    # composite is recomputed. Only zero-safety segments are touched.
+    # ------------------------------------------------------------------
+    print("Step 5b: Smoothing zero-safety segments...")
+    cur.execute(f"""
+        UPDATE street_scores s
+        SET safety_score  = smoothed.neighbour_avg,
+            composite_score = ROUND(((
+                COALESCE(s.volume_score  * {wv}, 0) +
+                COALESCE(s.speed_score   * {ws}, 0) +
+                COALESCE(smoothed.neighbour_avg
+                    * CASE WHEN s.volume_score IS NOT NULL THEN LEAST(1.0, s.volume_score / 60.0) ELSE 1.0 END
+                    * {wsa}, 0) +
+                COALESCE(s.cutthrough_score * {wc}, 0)
+            ) / (
+                CASE WHEN s.volume_score   IS NOT NULL THEN {wv}  ELSE 0 END +
+                CASE WHEN s.speed_score    IS NOT NULL THEN {ws}  ELSE 0 END +
+                CASE WHEN smoothed.neighbour_avg IS NOT NULL THEN {wsa}
+                    * CASE WHEN s.volume_score IS NOT NULL THEN LEAST(1.0, s.volume_score / 60.0) ELSE 1.0 END
+                    ELSE 0 END +
+                CASE WHEN s.cutthrough_score IS NOT NULL THEN {wc} ELSE 0 END
+            ))::numeric, 1)
+        FROM (
+            SELECT s2.segment_id, AVG(s3.safety_score) AS neighbour_avg
+            FROM street_scores s2
+            JOIN road_segments rs2 ON rs2.id = s2.segment_id
+            JOIN road_segments rs3 ON (
+                rs3.name = rs2.name
+                AND rs3.name IS NOT NULL
+                AND rs3.id != rs2.id
+                AND ST_DWithin(rs2.geometry, rs3.geometry, 0.00135)
+            )
+            JOIN street_scores s3 ON s3.segment_id = rs3.id AND s3.safety_score > 0
+            WHERE s2.safety_score = 0
+            GROUP BY s2.segment_id
+        ) smoothed
+        WHERE s.segment_id = smoothed.segment_id
+    """)
+    conn.commit()
+    print(f"  {cur.rowcount:,} zero-safety segments smoothed")
 
     # Summary stats
     cur.execute("""
