@@ -309,7 +309,7 @@ def run():
             ORDER BY c.id, c.geometry <-> rs.geometry
         ),
         attributed_collisions AS (
-            -- Step 2: spread each collision to same-named segments within 33m.
+            -- Step 2: spread each collision to same-named segments within 150m.
             -- UNION (not OR) so each branch can use its own index.
             -- Path A: always include the directly nearest segment (handles unnamed roads)
             SELECT rs.id AS segment_id, n.collision_id
@@ -461,38 +461,45 @@ def run():
     # ------------------------------------------------------------------
     print("Step 5b: Smoothing zero-safety segments...")
     cur.execute(f"""
+        WITH zero_safety AS (
+            -- Materialise zero-safety candidates first — keeps the spatial
+            -- join below small rather than scanning all 46k segments.
+            SELECT s.segment_id, rs.geometry, rs.name
+            FROM street_scores s
+            JOIN road_segments rs ON rs.id = s.segment_id
+            WHERE s.safety_score = 0 AND rs.name IS NOT NULL
+        ),
+        smoothed AS (
+            SELECT zs.segment_id,
+                   ROUND(AVG(s3.safety_score)::numeric, 1) AS neighbour_avg
+            FROM zero_safety zs
+            JOIN road_segments rs3 ON (
+                rs3.name = zs.name
+                AND rs3.id != zs.segment_id
+                AND ST_DWithin(zs.geometry, rs3.geometry, 0.00135)
+            )
+            JOIN street_scores s3 ON s3.segment_id = rs3.id AND s3.safety_score > 0
+            GROUP BY zs.segment_id
+        )
         UPDATE street_scores s
-        SET safety_score  = smoothed.neighbour_avg,
+        SET safety_score  = sm.neighbour_avg,
             composite_score = ROUND(((
                 COALESCE(s.volume_score  * {wv}, 0) +
                 COALESCE(s.speed_score   * {ws}, 0) +
-                COALESCE(smoothed.neighbour_avg
+                COALESCE(sm.neighbour_avg
                     * CASE WHEN s.volume_score IS NOT NULL THEN LEAST(1.0, s.volume_score / 60.0) ELSE 1.0 END
                     * {wsa}, 0) +
                 COALESCE(s.cutthrough_score * {wc}, 0)
             ) / (
                 CASE WHEN s.volume_score   IS NOT NULL THEN {wv}  ELSE 0 END +
                 CASE WHEN s.speed_score    IS NOT NULL THEN {ws}  ELSE 0 END +
-                CASE WHEN smoothed.neighbour_avg IS NOT NULL THEN {wsa}
+                CASE WHEN sm.neighbour_avg IS NOT NULL THEN {wsa}
                     * CASE WHEN s.volume_score IS NOT NULL THEN LEAST(1.0, s.volume_score / 60.0) ELSE 1.0 END
                     ELSE 0 END +
                 CASE WHEN s.cutthrough_score IS NOT NULL THEN {wc} ELSE 0 END
             ))::numeric, 1)
-        FROM (
-            SELECT s2.segment_id, ROUND(AVG(s3.safety_score)::numeric, 1) AS neighbour_avg
-            FROM street_scores s2
-            JOIN road_segments rs2 ON rs2.id = s2.segment_id
-            JOIN road_segments rs3 ON (
-                rs3.name = rs2.name
-                AND rs3.name IS NOT NULL
-                AND rs3.id != rs2.id
-                AND ST_DWithin(rs2.geometry, rs3.geometry, 0.00135)
-            )
-            JOIN street_scores s3 ON s3.segment_id = rs3.id AND s3.safety_score > 0
-            WHERE s2.safety_score = 0
-            GROUP BY s2.segment_id
-        ) smoothed
-        WHERE s.segment_id = smoothed.segment_id
+        FROM smoothed sm
+        WHERE s.segment_id = sm.segment_id
     """)
     conn.commit()
     print(f"  {cur.rowcount:,} zero-safety segments smoothed")
