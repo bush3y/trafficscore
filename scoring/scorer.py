@@ -479,7 +479,7 @@ def run():
                 CASE WHEN s.cutthrough_score IS NOT NULL THEN {wc} ELSE 0 END
             ))::numeric, 1)
         FROM (
-            SELECT s2.segment_id, AVG(s3.safety_score) AS neighbour_avg
+            SELECT s2.segment_id, ROUND(AVG(s3.safety_score)::numeric, 1) AS neighbour_avg
             FROM street_scores s2
             JOIN road_segments rs2 ON rs2.id = s2.segment_id
             JOIN road_segments rs3 ON (
