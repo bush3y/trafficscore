@@ -280,13 +280,17 @@ def run():
 
     # ------------------------------------------------------------------
     # Step 3: Safety scores
-    # Two-step attribution:
+    # Two-step attribution + smoothing:
     #   1. Each collision is anchored to its nearest road segment — this
     #      determines the road NAME it belongs to, preventing cross-road
     #      spillover (e.g. 417 collisions claiming adjacent Melrose Ave).
-    #   2. The collision then counts for ALL same-named segments within 33m —
+    #   2. The collision then counts for ALL same-named segments within 150m —
     #      so a collision at an intersection benefits the whole Churchill Ave
     #      block, not just the single nearest segment node.
+    #   3. Segments that still score 0 are smoothed using the average safety
+    #      of their non-zero same-named neighbours within 150m — prevents
+    #      adjacent segments on the same road from scoring wildly differently
+    #      just because one block's collisions happened to land on the next.
     # ------------------------------------------------------------------
     print("Step 3: Computing safety scores (collision density)...")
     cur.execute("""
@@ -343,6 +347,31 @@ def run():
         FROM collision_counts
     """)
     conn.commit()
+
+    # Smooth zero-safety segments by averaging non-zero same-named neighbours.
+    # Only segments scoring 0 are adjusted; non-zero scores are unchanged.
+    cur.execute("""
+        UPDATE safety_scores s
+        SET safety_score = neighbour_avg
+        FROM (
+            SELECT s2.segment_id,
+                   AVG(s3.safety_score) AS neighbour_avg
+            FROM safety_scores s2
+            JOIN road_segments rs2 ON rs2.id = s2.segment_id
+            JOIN road_segments rs3 ON (
+                rs3.name = rs2.name
+                AND rs3.name IS NOT NULL
+                AND rs3.id != rs2.id
+                AND ST_DWithin(rs2.geometry, rs3.geometry, 0.00135)
+            )
+            JOIN safety_scores s3 ON s3.segment_id = rs3.id AND s3.safety_score > 0
+            WHERE s2.safety_score = 0
+            GROUP BY s2.segment_id
+        ) smoothed
+        WHERE s.segment_id = smoothed.segment_id
+    """)
+    conn.commit()
+
     cur.execute("SELECT COUNT(*) FROM safety_scores")
     print(f"  {cur.fetchone()[0]:,} segments scored for safety")
 
