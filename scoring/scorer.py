@@ -142,6 +142,17 @@ def run():
     """)
     cur.execute("CREATE INDEX ON tmp_direct_has_name (segment_id)")
 
+    # Segments with ANY direct TomTom match (even sparse/sub-threshold).
+    # These are excluded from spatial fallback — if TomTom data exists for the
+    # segment itself, using nearby road data would contaminate it (e.g. a quiet
+    # dead-end next to the 417 inheriting highway probe counts via spatial fallback).
+    cur.execute("""
+        CREATE TEMP TABLE tmp_has_direct_tomtom AS
+        SELECT DISTINCT segment_id FROM tomtom_segments
+        WHERE segment_id IS NOT NULL AND time_set = 'all_day'
+    """)
+    cur.execute("CREATE INDEX ON tmp_has_direct_tomtom (segment_id)")
+
     cur.execute("""
         CREATE TEMP TABLE tmp_spatial_named_pairs AS
         SELECT rs.id AS segment_id,
@@ -202,6 +213,7 @@ def run():
                    MIN(speed_limit)   AS speed_limit
             FROM tmp_spatial_named_pairs
             WHERE segment_id NOT IN (SELECT segment_id FROM direct_match)
+              AND segment_id NOT IN (SELECT segment_id FROM tmp_has_direct_tomtom)
             GROUP BY segment_id
             UNION ALL
             SELECT rs.id AS segment_id,
@@ -214,6 +226,7 @@ def run():
               AND ts.probe_count IS NOT NULL
               AND rs.id NOT IN (SELECT segment_id FROM direct_match)
               AND rs.id NOT IN (SELECT segment_id FROM tmp_spatial_has_name)
+              AND rs.id NOT IN (SELECT segment_id FROM tmp_has_direct_tomtom)
               AND NOT (rs.road_class IN ('residential', 'unclassified', 'living_street')
                        AND ts.probe_count > 200)
             GROUP BY rs.id, rs.speed_limit
