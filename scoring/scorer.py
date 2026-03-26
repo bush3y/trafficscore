@@ -285,7 +285,7 @@ def run():
                 c.id AS collision_id,
                 rs.id AS segment_id
             FROM collisions c
-            JOIN road_segments rs ON ST_DWithin(rs.geometry::geography, c.geometry::geography, 15)
+            JOIN road_segments rs ON ST_DWithin(rs.geometry, c.geometry, 0.000135)
             WHERE c.year >= 2019
             ORDER BY c.id, c.geometry <-> rs.geometry
         ),
