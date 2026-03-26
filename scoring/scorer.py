@@ -309,7 +309,7 @@ def run():
                 GREATEST(ST_Length(rs.geometry::geography) / 1000.0, 0.05) AS length_km
             FROM road_segments rs
             LEFT JOIN nearest_segment n ON n.segment_id = rs.id
-            GROUP BY rs.id, rs.geometry
+            GROUP BY rs.id
         )
         SELECT
             segment_id,
