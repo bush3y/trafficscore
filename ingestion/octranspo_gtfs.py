@@ -16,6 +16,7 @@ import io
 import os
 import zipfile
 from collections import defaultdict
+from datetime import date
 
 import psycopg2
 import requests
@@ -56,13 +57,17 @@ def run():
     routes = {r["route_id"]: r["route_short_name"] for r in read_csv(zf, "routes.txt")}
     print(f"  {len(routes)} routes")
 
-    # Calendar: find service_ids that run on a typical weekday (Monday)
+    # Calendar: find service_ids active today that run on Monday.
+    # GTFS files include multiple schedule periods — filter to the current one
+    # to avoid inflating trip counts with future schedules.
     print("Parsing calendar...")
+    today = date.today().strftime("%Y%m%d")
     weekday_services = set()
     for row in read_csv(zf, "calendar.txt"):
-        if row.get("monday") == "1":
+        if (row.get("monday") == "1"
+                and row["start_date"] <= today <= row["end_date"]):
             weekday_services.add(row["service_id"])
-    print(f"  {len(weekday_services)} weekday service IDs")
+    print(f"  {len(weekday_services)} active weekday service IDs (as of {today})")
 
     # Trips: count weekday trips per route, collect shape IDs
     print("Parsing trips...")
