@@ -4,6 +4,7 @@ python-dotenv==1.0.0
 fastapi==0.111.0
 uvicorn==0.29.0
 networkx==3.3
+numpy==1.26.4
 shapely==2.0.4
 osmnx==2.0.1
 geopandas==1.0.1
