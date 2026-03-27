@@ -530,78 +530,71 @@ def validation():
     conn = get_conn()
     cur = conn.cursor()
 
-    # Spearman correlation by road class
+    # Build matched pairs once — reused by all three queries below.
+    # Name-match filter: segment's first word must appear at the start of one
+    # of the two road names in the intersection_name (split on " @ ").
+    # This eliminates cross-road spatial contamination (e.g. a small side road
+    # matched to a count measuring the major arterial 50m away).
     cur.execute("""
+        CREATE TEMP TABLE val_pairs AS
         WITH latest_volumes AS (
             SELECT DISTINCT ON (intersection_name)
                 intersection_name, volume, geometry
             FROM intersection_volumes
             ORDER BY intersection_name, year DESC
-        ),
-        segment_vs_count AS (
-            SELECT DISTINCT ON (rs.id)
-                rs.id,
-                rs.name,
-                rs.road_class,
-                ss.volume_score,
-                lv.volume AS measured_volume,
-                lv.intersection_name
-            FROM latest_volumes lv
-            JOIN road_segments rs ON ST_DWithin(rs.geometry, lv.geometry, 0.0005)
-            JOIN street_scores ss ON ss.segment_id = rs.id
-            WHERE ss.volume_score IS NOT NULL
-            ORDER BY rs.id, ST_Distance(rs.geometry, lv.geometry)
-        ),
-        ranked AS (
-            SELECT *,
-                PERCENT_RANK() OVER (ORDER BY volume_score)    AS rank_score,
-                PERCENT_RANK() OVER (ORDER BY measured_volume) AS rank_measured
-            FROM segment_vs_count
         )
+        SELECT DISTINCT ON (rs.id)
+            rs.id,
+            rs.name,
+            rs.road_class,
+            ss.volume_score,
+            ss.composite_score,
+            lv.volume            AS measured_volume,
+            lv.intersection_name
+        FROM latest_volumes lv
+        JOIN road_segments rs ON ST_DWithin(rs.geometry, lv.geometry, 0.0005)
+        JOIN street_scores ss  ON ss.segment_id = rs.id
+        WHERE ss.volume_score IS NOT NULL
+          AND rs.name IS NOT NULL
+          AND LENGTH(split_part(rs.name, ' ', 1)) >= 3
+          AND (
+            LOWER(split_part(lv.intersection_name, ' @ ', 1)) LIKE LOWER(split_part(rs.name, ' ', 1)) || '%'
+            OR LOWER(split_part(lv.intersection_name, ' @ ', 2)) LIKE LOWER(split_part(rs.name, ' ', 1)) || '%'
+          )
+        ORDER BY rs.id, ST_Distance(rs.geometry, lv.geometry)
+    """)
+
+    cur.execute("""
+        CREATE TEMP TABLE val_ranked AS
+        SELECT *,
+            PERCENT_RANK() OVER (ORDER BY volume_score)    AS rank_score,
+            PERCENT_RANK() OVER (ORDER BY measured_volume) AS rank_measured
+        FROM val_pairs
+    """)
+    conn.commit()
+
+    # Spearman correlation by road class
+    cur.execute("""
         SELECT
             road_class,
-            COUNT(*)                                                          AS pairs,
-            ROUND(CORR(rank_score, rank_measured)::numeric, 3)               AS spearman,
-            COUNT(*) FILTER (WHERE ABS(rank_score - rank_measured) > 0.4)    AS large_mismatch,
-            ROUND(AVG(volume_score)::numeric, 1)                             AS avg_vol_score,
-            ROUND(AVG(measured_volume)::numeric, 0)                          AS avg_measured
-        FROM ranked
+            COUNT(*)                                                       AS pairs,
+            ROUND(CORR(rank_score, rank_measured)::numeric, 3)            AS spearman,
+            COUNT(*) FILTER (WHERE ABS(rank_score - rank_measured) > 0.4) AS large_mismatch,
+            ROUND(AVG(volume_score)::numeric, 1)                          AS avg_vol_score,
+            ROUND(AVG(measured_volume)::numeric, 0)                       AS avg_measured
+        FROM val_ranked
         GROUP BY road_class
         HAVING COUNT(*) >= 10
         ORDER BY spearman DESC
     """)
     correlations = [dict(r) for r in cur.fetchall()]
 
-    # Top outliers: scored HIGH but measured LOW (overscored)
+    # Top outliers: scored HIGH but measured LOW (overscored).
+    # Deduplicated by (name, road_class, intersection_name) — keeps the
+    # segment with the largest gap when multiple OSM segments of the same
+    # road match the same count location.
     cur.execute("""
-        WITH latest_volumes AS (
-            SELECT DISTINCT ON (intersection_name)
-                intersection_name, volume, geometry
-            FROM intersection_volumes
-            ORDER BY intersection_name, year DESC
-        ),
-        segment_vs_count AS (
-            SELECT DISTINCT ON (rs.id)
-                rs.id,
-                rs.name,
-                rs.road_class,
-                ss.volume_score,
-                ss.composite_score,
-                lv.volume          AS measured_volume,
-                lv.intersection_name
-            FROM latest_volumes lv
-            JOIN road_segments rs ON ST_DWithin(rs.geometry, lv.geometry, 0.0005)
-            JOIN street_scores ss ON ss.segment_id = rs.id
-            WHERE ss.volume_score IS NOT NULL
-            ORDER BY rs.id, ST_Distance(rs.geometry, lv.geometry)
-        ),
-        ranked AS (
-            SELECT *,
-                PERCENT_RANK() OVER (ORDER BY volume_score)    AS rank_score,
-                PERCENT_RANK() OVER (ORDER BY measured_volume) AS rank_measured
-            FROM segment_vs_count
-        )
-        SELECT
+        SELECT DISTINCT ON (name, road_class, intersection_name)
             id::text, name, road_class,
             ROUND(volume_score::numeric, 1)    AS volume_score,
             ROUND(composite_score::numeric, 1) AS composite_score,
@@ -610,43 +603,17 @@ def validation():
             ROUND((rank_score    * 100)::numeric, 1) AS pct_rank_score,
             ROUND((rank_measured * 100)::numeric, 1) AS pct_rank_measured,
             ROUND(((rank_score - rank_measured) * 100)::numeric, 1) AS rank_gap
-        FROM ranked
+        FROM val_ranked
         WHERE rank_score - rank_measured > 0.4
-        ORDER BY rank_gap DESC
+        ORDER BY name, road_class, intersection_name, rank_gap DESC
         LIMIT 40
     """)
     overscored = [dict(r) for r in cur.fetchall()]
+    overscored.sort(key=lambda r: r["rank_gap"], reverse=True)
 
-    # Top outliers: scored LOW but measured HIGH (underscored)
+    # Top outliers: scored LOW but measured HIGH (underscored).
     cur.execute("""
-        WITH latest_volumes AS (
-            SELECT DISTINCT ON (intersection_name)
-                intersection_name, volume, geometry
-            FROM intersection_volumes
-            ORDER BY intersection_name, year DESC
-        ),
-        segment_vs_count AS (
-            SELECT DISTINCT ON (rs.id)
-                rs.id,
-                rs.name,
-                rs.road_class,
-                ss.volume_score,
-                ss.composite_score,
-                lv.volume          AS measured_volume,
-                lv.intersection_name
-            FROM latest_volumes lv
-            JOIN road_segments rs ON ST_DWithin(rs.geometry, lv.geometry, 0.0005)
-            JOIN street_scores ss ON ss.segment_id = rs.id
-            WHERE ss.volume_score IS NOT NULL
-            ORDER BY rs.id, ST_Distance(rs.geometry, lv.geometry)
-        ),
-        ranked AS (
-            SELECT *,
-                PERCENT_RANK() OVER (ORDER BY volume_score)    AS rank_score,
-                PERCENT_RANK() OVER (ORDER BY measured_volume) AS rank_measured
-            FROM segment_vs_count
-        )
-        SELECT
+        SELECT DISTINCT ON (name, road_class, intersection_name)
             id::text, name, road_class,
             ROUND(volume_score::numeric, 1)    AS volume_score,
             ROUND(composite_score::numeric, 1) AS composite_score,
@@ -655,12 +622,13 @@ def validation():
             ROUND((rank_score    * 100)::numeric, 1) AS pct_rank_score,
             ROUND((rank_measured * 100)::numeric, 1) AS pct_rank_measured,
             ROUND(((rank_measured - rank_score) * 100)::numeric, 1) AS rank_gap
-        FROM ranked
+        FROM val_ranked
         WHERE rank_measured - rank_score > 0.4
-        ORDER BY rank_gap DESC
+        ORDER BY name, road_class, intersection_name, rank_gap DESC
         LIMIT 40
     """)
     underscored = [dict(r) for r in cur.fetchall()]
+    underscored.sort(key=lambda r: r["rank_gap"], reverse=True)
 
     # Safety cross-validation: compare 2019-2022 collision density vs 2023-2024 collision density
     # Streets that were high-safety in early period should still be high in later period
