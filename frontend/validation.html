@@ -115,9 +115,10 @@
 
     function renderOutliers(rows, direction) {
       const pillCls = direction === 'over' ? 'gap-over' : 'gap-under';
+      const isRamp = rc => typeof rc === 'string' && rc.includes('motorway_link');
       const html = rows.map(r => `
-        <tr>
-          <td>${r.name || '<span class="dim">unnamed</span>'}</td>
+        <tr${isRamp(r.road_class) ? ' style="opacity:0.55"' : ''}>
+          <td>${r.name || '<span class="dim">unnamed</span>'}${isRamp(r.road_class) ? ' <span title="Interchange ramp — TomTom coverage gaps expected" style="font-size:0.72rem;color:#aaa;cursor:default;">🛣 ramp</span>' : ''}</td>
           <td>${r.road_class}</td>
           <td class="r">${scoreBadge(r.composite_score)}</td>
           <td class="r">${r.pct_rank_score}th pct</td>
