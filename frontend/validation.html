@@ -44,6 +44,21 @@
     .s35 { background: #ffedd5; color: #9a3412; }
     .s65 { background: #fee2e2; color: #991b1b; }
 
+    .tag { display: inline-block; padding: 1px 6px; border-radius: 8px;
+           font-size: 0.7rem; margin-left: 5px; cursor: help; vertical-align: middle; }
+    .tag-ramp      { background: #f1f5f9; color: #94a3b8; }
+    .tag-reviewed  { background: #dcfce7; color: #166534; }
+    .tag-pattern   { background: #fef9c3; color: #713f12; }
+
+    /* Dim ramp rows; highlight reviewed rows subtly */
+    tr.is-ramp     { opacity: 0.5; }
+    tr.is-reviewed { background: #f0fdf4 !important; }
+    tr.is-pattern  { background: #fefce8 !important; }
+
+    .callout { background: #fefce8; border: 1px solid #fde047; border-radius: 8px;
+               padding: 12px 16px; font-size: 0.82rem; color: #713f12; margin-bottom: 14px; line-height: 1.5; }
+    .callout strong { font-weight: 600; }
+
     .stat-row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 4px; }
     .stat-card { background: white; border-radius: 10px; padding: 16px 20px;
                  box-shadow: 0 1px 4px rgba(0,0,0,0.08); min-width: 160px; }
@@ -56,6 +71,9 @@
     .footer  { margin-top: 32px; font-size: 0.78rem; color: #aaa; }
 
     .dim { color: #bbb; }
+
+    .legend { font-size: 0.78rem; color: #888; margin-bottom: 10px; display: flex; gap: 16px; flex-wrap: wrap; }
+    .legend-item { display: flex; align-items: center; gap: 5px; }
   </style>
 </head>
 <body>
@@ -67,6 +85,33 @@
   <div class="footer" id="footer"></div>
 
   <script>
+    // Researched outliers — rows where we've dug into the cause.
+    // Key: road name (exact match). Value: { reason, kind }
+    //   kind: 'reviewed' (investigated, expected/explained)
+    //         'pattern'  (part of a known systematic bias)
+    const RESEARCHED = {
+      // Overscored — downtown one-way bus corridor inflation
+      'Kent Street':        { kind: 'pattern',  reason: 'Downtown one-way bus corridor. TomTom probe counts are inflated ~10× vs city counts due to OC Transpo GPS data — buses running every few minutes generate hundreds of probe events/day vs a single vehicle count. Known systematic bias for Centretown one-way streets with frequent bus service.' },
+      "O'Connor Street":    { kind: 'pattern',  reason: 'Downtown one-way bus corridor. Same pattern as Kent St — OC Transpo bus probe inflation. Probe:vehicle ratios of 8–10× observed at mid-corridor intersections.' },
+      'Metcalfe Street':    { kind: 'pattern',  reason: 'Downtown one-way bus corridor. Bus probe inflation pattern. Probe counts 4–10× higher than city intersection counts depending on location.' },
+      'Lyon Street North':  { kind: 'pattern',  reason: 'Downtown one-way corridor. Part of the Centretown bus probe inflation pattern, though less severe than Kent/O\'Connor.' },
+      'Lees Avenue':        { kind: 'pattern',  reason: 'One-way transitway-adjacent corridor. Likely bus/LRT probe inflation near Lees transit station.' },
+
+      // Overscored — Queensway proximity
+      'Parkdale Avenue':    { kind: 'reviewed', reason: 'Queensway (Hwy 417) TomTom segments (690k+ probes) are matched to Parkdale Ave OSM segments at the overpass, but correctly filtered out by road_names_match. Genuine Parkdale Ave TomTom data is ~73–89k probes — high, likely due to proximity to Queensway ramps. City count at Sherwood Dr is at the quieter north end of the road, not the busy south end near the 417.' },
+
+      // Overscored — rural probe bias
+      'Devine Road':        { kind: 'reviewed', reason: 'Rural secondary road. Low city count (1,472 vehicles/day) but elevated TomTom score. Likely commercial/farm vehicle probe bias — a small number of trucks making regular runs generates disproportionate probe counts on low-traffic rural roads.' },
+      'McGee Side Road':    { kind: 'reviewed', reason: 'Rural tertiary road. Very low city count (397 vehicles/day). Same rural commercial vehicle probe bias as Devine Road.' },
+      'Panmure Road':       { kind: 'reviewed', reason: 'Rural secondary. Low count (431 vehicles/day). Rural commercial probe bias.' },
+
+      // Underscored — interchange coverage gaps
+      'Aviation Parkway':   { kind: 'reviewed', reason: 'Main corridor scores correctly (85–96) after road_names_match abbreviation fix (Aviation Pky → Aviation Parkway). Outlier is from two interchange-approach segments near Ogilvie Rd/417 that only have 225–248 probe counts — TomTom has sparse coverage at the ramp junction. One segment also has ON-417 data (315k probes) matched to it which is correctly filtered out.' },
+
+      // Underscored — TomTom coverage gaps on specific roads
+      'Basil Macdonald Way': { kind: 'reviewed', reason: 'Tertiary road with high city count (39k). Low TomTom probe coverage — road may be relatively new or not well-represented in TomTom\'s probe dataset.' },
+    };
+
     function scoreBadge(s) {
       if (s === null || s === undefined) return '<span class="dim">—</span>';
       const n = Number(s);
@@ -116,9 +161,23 @@
     function renderOutliers(rows, direction) {
       const pillCls = direction === 'over' ? 'gap-over' : 'gap-under';
       const isRamp = rc => typeof rc === 'string' && rc.includes('motorway_link');
-      const html = rows.map(r => `
-        <tr${isRamp(r.road_class) ? ' style="opacity:0.55"' : ''}>
-          <td>${r.name || '<span class="dim">unnamed</span>'}${isRamp(r.road_class) ? ' <span title="Interchange ramp — TomTom coverage gaps expected" style="font-size:0.72rem;color:#aaa;cursor:default;">🛣 ramp</span>' : ''}</td>
+
+      const html = rows.map(r => {
+        const ramp = isRamp(r.road_class);
+        const info = RESEARCHED[r.name];
+        const rowCls = ramp ? 'is-ramp' : info ? `is-${info.kind}` : '';
+
+        let tags = '';
+        if (ramp) tags += `<span class="tag tag-ramp" title="Interchange ramp — TomTom coverage gaps expected here">🛣 ramp</span>`;
+        if (info) {
+          const label = info.kind === 'pattern' ? '⚠︎ known pattern' : '✓ reviewed';
+          const cls   = info.kind === 'pattern' ? 'tag-pattern' : 'tag-reviewed';
+          tags += `<span class="tag ${cls}" title="${info.reason.replace(/"/g, '&quot;')}">${label}</span>`;
+        }
+
+        return `
+        <tr class="${rowCls}">
+          <td>${r.name || '<span class="dim">unnamed</span>'}${tags}</td>
           <td>${r.road_class}</td>
           <td class="r">${scoreBadge(r.composite_score)}</td>
           <td class="r">${r.pct_rank_score}th pct</td>
@@ -126,8 +185,17 @@
           <td class="r">${r.pct_rank_measured}th pct</td>
           <td class="r"><span class="gap-pill ${pillCls}">+${r.rank_gap} pts</span></td>
           <td style="font-size:0.78rem;color:#888;">${r.intersection_name}</td>
-        </tr>`).join('');
-      return `
+        </tr>`;
+      }).join('');
+
+      const legend = `
+        <div class="legend">
+          <span class="legend-item"><span class="tag tag-reviewed">✓ reviewed</span> Investigated — cause understood</span>
+          <span class="legend-item"><span class="tag tag-pattern">⚠︎ known pattern</span> Part of a documented systematic bias</span>
+          <span class="legend-item"><span class="tag tag-ramp">🛣 ramp</span> Interchange ramp — coverage gaps expected</span>
+        </div>`;
+
+      return legend + `
         <table>
           <thead><tr>
             <th>Segment</th>
@@ -185,16 +253,24 @@
           </div>
 
           <h2>Overscored Segments <span style="font-weight:400;color:#888;font-size:0.82rem;">— volume score much higher than measured count suggests</span></h2>
+          <div class="callout">
+            <strong>Known pattern: Centretown one-way bus corridors</strong> (Kent, O'Connor, Metcalfe, Lyon, Lees).
+            TomTom probe counts run 4–10× higher than city intersection counts on these streets.
+            Likely cause: OC Transpo buses are GPS-tracked continuously — a route running every 5 minutes
+            generates hundreds of probe events per day vs a single vehicle count per pass.
+            Scores on these streets are probably inflated but directionally correct (they are genuinely busy).
+          </div>
           <div class="section-note">
             These segments have a high TomTom-based volume score but a relatively low measured traffic count nearby.
-            Could indicate TomTom probe bias, spatial mismatch between the segment and count location, or legitimate data gaps.
+            Could indicate TomTom probe bias, spatial mismatch, or legitimate data gaps. Hover tags for details.
           </div>
           ${renderOutliers(d.overscored, 'over')}
 
           <h2>Underscored Segments <span style="font-weight:400;color:#888;font-size:0.82rem;">— volume score much lower than measured count suggests</span></h2>
           <div class="section-note">
             These segments have a low TomTom-based volume score but a high measured traffic count nearby.
-            Could indicate TomTom coverage gaps (few probes on this road), or the count location being on a different nearby road.
+            Could indicate TomTom coverage gaps (few probes on this road), or a spatial mismatch with the count location.
+            Hover tags for details.
           </div>
           ${renderOutliers(d.underscored, 'under')}
         `;
