@@ -128,6 +128,31 @@ Each entry gets a hover tooltip (`reason`) explaining what was found. Reviewed r
 
 **Always add a RESEARCHED entry when**: investigating an outlier on this dashboard, diagnosing an unusual score on the map, or identifying a known data quirk that causes systematic bias for a road or road type.
 
+## Development Activity Data
+
+Two City of Ottawa datasets surface planning and construction activity near a street:
+
+**Construction Forecast** (`construction_forecast` table)
+- City-led infrastructure construction (road resurfacing, watermain, sewer, parks)
+- Two layers: linear (road geometry) and localized (point features)
+- `targeted_start`: "This Year", "1-2 Years", "2-3 Years"
+- Full refresh monthly — small dataset (~2,500 records)
+- Source: ArcGIS REST API, no auth required
+
+**Development Applications** (`development_applications` table)
+- Planning applications for significant residential development
+- Filtered types: Site Plan Control, Plan of Condominium, Official Plan Amendment, Zoning By-law Amendment, Plan of Subdivision
+- Excludes "Approval Lapsed" status; all other statuses retained and shown in UI
+- Full refresh monthly (paginated at 1,000/page, ~4 pages)
+- Source: ArcGIS REST API, no auth required
+- **No unit count in the data** — use application type as proxy for scale:
+  - Plan of Condominium = definitively multi-unit (almost always 20+)
+  - OPA = large-scale intensification
+  - ZBA + SPC at same address = significant rezoning
+  - Standalone SPC alone = weaker signal (10+ units or commercial)
+
+**Frontend**: `/api/development-activity?lat=&lng=&radius_m=` (default 500m) — surfaced as "🚧 Nearby activity" card in the sidebar for both segment clicks and address searches.
+
 ## Pending / Future Ideas
 - **Neighbourhood browse**: search by neighbourhood name ("Westboro") and get aggregate score card
 - **TomTom refresh**: trial was August 2024 only. Paid plan would allow monthly/quarterly refresh. HERE Traffic Analytics is an alternative but requires new ingestion script + segment matching logic.
@@ -142,6 +167,8 @@ python -m ingestion.ottawa_collisions --dir ./data/collisions  # Load collision 
 python -m ingestion.ottawa_volumes --dir ./data/volumes  # Load intersection volume CSVs
 python -m ingestion.ottawa_neighbourhoods                # Download + load ONS neighbourhood boundaries
 python -m ingestion.octranspo_gtfs                       # Download + load OC Transpo bus routes (GTFS)
+python -m ingestion.construction_forecast                # Fetch City of Ottawa construction forecast (monthly)
+python -m ingestion.ottawa_development                   # Fetch Ottawa development applications (monthly)
 python -m scoring.cutthrough                             # Compute cut-through risk scores
 python -m scoring.scorer                                 # Run full scoring pipeline
 # On server: docker compose build app && docker compose run --rm app python -m scoring.scorer

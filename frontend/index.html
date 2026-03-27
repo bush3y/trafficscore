@@ -403,6 +403,43 @@
       </div>`;
   }
 
+  function renderDevelopmentRow(data) {
+    if (!data) return "";
+    const { construction, development } = data;
+    if (!construction.length && !development.length) return "";
+
+    const lines = [];
+
+    if (construction.length) {
+      const thisYear = construction.filter(c => c.targeted_start === "This Year").length;
+      let txt = `City construction: ${construction.length} project${construction.length > 1 ? "s" : ""} within 500m`;
+      if (thisYear) txt += ` (${thisYear} this year)`;
+      lines.push(txt);
+    }
+
+    if (development.length) {
+      const counts = {};
+      for (const d of development) {
+        const short = d.application_type === "Plan of Condominium"   ? "condo plan"  :
+                      d.application_type === "Site Plan Control"      ? "site plan"   :
+                      d.application_type === "Official Plan Amendment" ? "OPA"         :
+                      d.application_type === "Zoning By-law Amendment"? "rezoning"    :
+                      d.application_type === "Plan of Subdivision"    ? "subdivision" :
+                      d.application_type;
+        counts[short] = (counts[short] || 0) + 1;
+      }
+      const typeStr = Object.entries(counts)
+        .map(([t, n]) => n > 1 ? `${n} ${t}s` : t).join(", ");
+      lines.push(`Development applications: ${development.length} within 500m (${typeStr})`);
+    }
+
+    return `
+      <div style="margin-top:12px;padding:10px 12px;background:#fff7ed;border-left:3px solid #fb923c;border-radius:8px;font-size:0.82rem;color:#444;">
+        <div style="font-weight:600;margin-bottom:6px;">🚧 Nearby activity</div>
+        ${lines.map(l => `<div>${l}</div>`).join("")}
+      </div>`;
+  }
+
   function segmentCentroid(geometry) {
     if (!geometry) return null;
     const coords = geometry.type === "LineString"
@@ -457,6 +494,7 @@
       <div id="relative-row"></div>
       <div id="nb-row"></div>
       <div id="bus-routes-row"></div>
+      <div id="development-row"></div>
 
       ${props.cutthrough_risk != null ? `
         <div style="margin-top:12px;font-size:0.8rem;color:#666;">
@@ -483,8 +521,9 @@
         fetch(`/api/reverse-geocode?lat=${lat}&lng=${lng}`).then(r => r.json()),
         fetch(`/api/relative?road_class=${encodeURIComponent(props.road_class)}&score=${props.composite_score}&lat=${lat}&lng=${lng}`).then(r => r.json()).catch(() => null),
         fetch(`/api/bus-routes?lat=${lat}&lng=${lng}`).then(r => r.json()).catch(() => null),
+        fetch(`/api/development-activity?lat=${lat}&lng=${lng}`).then(r => r.json()).catch(() => null),
       ])
-    ).then(([nb, geo, rel, bus]) => {
+    ).then(([nb, geo, rel, bus, dev]) => {
       shareData = { ...shareData, relData: rel, nbScore: nb?.avg_score, nbName: geo?.neighbourhood };
       const relEl = document.getElementById("relative-row");
       if (relEl) relEl.innerHTML = renderRelativeRow(rel);
@@ -492,6 +531,8 @@
       if (el && nb) el.innerHTML = renderNeighbourhoodRow(nb.avg_score, geo?.neighbourhood);
       const busEl = document.getElementById("bus-routes-row");
       if (busEl && bus) busEl.innerHTML = renderBusRoutesRow(bus.routes);
+      const devEl = document.getElementById("development-row");
+      if (devEl) devEl.innerHTML = renderDevelopmentRow(dev);
     }).catch(() => {});
   }
 
@@ -720,6 +761,7 @@ function addressMessage(score) {
 
       <div id="relative-row"></div>
       <div id="bus-routes-row"></div>
+      <div id="development-row"></div>
       ${renderNeighbourhoodRow(neighbourhoodScore, neighbourhood)}
       <button id="share-btn" onclick="copyShareLink()" style="margin-top:12px;width:100%;padding:8px;background:#f5f5f5;border:1px solid #e0e0e0;border-radius:6px;font-size:0.82rem;color:#555;cursor:pointer;">🔗 Share</button>
     `;
@@ -820,12 +862,15 @@ function addressMessage(score) {
             Promise.all([
               fetch(`/api/relative?road_class=${encodeURIComponent(p.road_class)}&score=${p.composite_score}&lat=${lat}&lng=${lon}`).then(r => r.json()).catch(() => null),
               fetch(`/api/bus-routes?lat=${lat}&lng=${lon}`).then(r => r.json()).catch(() => null),
-            ]).then(([rel, bus]) => {
+              fetch(`/api/development-activity?lat=${lat}&lng=${lon}`).then(r => r.json()).catch(() => null),
+            ]).then(([rel, bus, dev]) => {
               shareData = { ...shareData, relData: rel };
               const relEl = document.getElementById("relative-row");
               if (relEl && rel) relEl.innerHTML = renderRelativeRow(rel);
               const busEl = document.getElementById("bus-routes-row");
               if (busEl && bus) busEl.innerHTML = renderBusRoutesRow(bus.routes);
+              const devEl = document.getElementById("development-row");
+              if (devEl) devEl.innerHTML = renderDevelopmentRow(dev);
             }).catch(() => {});
 
             // Show other nearby streets as a secondary list

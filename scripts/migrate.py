@@ -35,6 +35,35 @@ MIGRATIONS = [
         ALTER TABLE bus_routes ADD COLUMN IF NOT EXISTS schedule_start DATE;
         ALTER TABLE bus_routes ADD COLUMN IF NOT EXISTS schedule_end   DATE;
     """),
+    ("construction_forecast table", """
+        CREATE TABLE IF NOT EXISTS construction_forecast (
+            objectid        INTEGER PRIMARY KEY,
+            layer           TEXT NOT NULL,
+            feature_type    TEXT,
+            status          TEXT,
+            targeted_start  TEXT,
+            project_webpage TEXT,
+            geometry        GEOMETRY(Geometry, 4326),
+            pulled_at       TIMESTAMPTZ DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS construction_forecast_geom_idx
+            ON construction_forecast USING GIST(geometry);
+    """),
+    ("development_applications table", """
+        CREATE TABLE IF NOT EXISTS development_applications (
+            objectid           INTEGER PRIMARY KEY,
+            application_number TEXT,
+            application_date   DATE,
+            application_type   TEXT,
+            status             TEXT,
+            status_date        DATE,
+            address            TEXT,
+            geometry           GEOMETRY(Point, 4326),
+            pulled_at          TIMESTAMPTZ DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS development_applications_geom_idx
+            ON development_applications USING GIST(geometry);
+    """),
 ]
 
 

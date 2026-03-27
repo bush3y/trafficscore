@@ -510,6 +510,18 @@ def admin_status():
     """)
     bus_routes = dict(cur.fetchone())
 
+    cur.execute("""
+        SELECT COUNT(*) AS count, MAX(pulled_at)::text AS last_pulled
+        FROM construction_forecast
+    """)
+    construction_forecast = dict(cur.fetchone())
+
+    cur.execute("""
+        SELECT COUNT(*) AS count, MAX(pulled_at)::text AS last_pulled
+        FROM development_applications
+    """)
+    development_applications = dict(cur.fetchone())
+
     cur.close()
     conn.close()
 
@@ -521,7 +533,54 @@ def admin_status():
         "scores": scores,
         "neighbourhoods": neighbourhoods,
         "bus_routes": bus_routes,
+        "construction_forecast": construction_forecast,
+        "development_applications": development_applications,
     }
+
+
+@app.get("/api/development-activity")
+def get_development_activity(
+    lat: float = Query(...),
+    lng: float = Query(...),
+    radius_m: int = Query(500),
+):
+    """City construction projects and development applications near a point."""
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT
+            feature_type,
+            status,
+            targeted_start,
+            project_webpage,
+            ROUND(ST_Distance(geometry::geography, ST_MakePoint(%s, %s)::geography)::numeric) AS distance_m
+        FROM construction_forecast
+        WHERE ST_DWithin(geometry::geography, ST_MakePoint(%s, %s)::geography, %s)
+        ORDER BY distance_m
+        LIMIT 10
+    """, [lng, lat, lng, lat, radius_m])
+    construction = [dict(r) for r in cur.fetchall()]
+
+    cur.execute("""
+        SELECT
+            application_number,
+            application_type,
+            status,
+            status_date::text AS status_date,
+            address,
+            ROUND(ST_Distance(geometry::geography, ST_MakePoint(%s, %s)::geography)::numeric) AS distance_m
+        FROM development_applications
+        WHERE ST_DWithin(geometry::geography, ST_MakePoint(%s, %s)::geography, %s)
+        ORDER BY distance_m
+        LIMIT 10
+    """, [lng, lat, lng, lat, radius_m])
+    development = [dict(r) for r in cur.fetchall()]
+
+    cur.close()
+    conn.close()
+
+    return {"construction": construction, "development": development}
 
 
 @app.get("/api/validation")
