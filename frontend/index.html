@@ -575,13 +575,9 @@
 
     const urlLine = `https://trafficscore.myke.org${window.location.search}`;
 
-    return [
-      line1,
-      line2,
-      trafficLine,
-      nbLine,
-      urlLine,
-    ].filter(Boolean).join("\n\n");
+    // Group score + traffic descriptor together; separate name, neighbourhood, and URL with blank lines
+    const scoreGroup = [line2, trafficLine].filter(Boolean).join("\n");
+    return [line1, scoreGroup, nbLine, urlLine].filter(Boolean).join("\n\n");
   }
 
   window.copyShareLink = function() {
