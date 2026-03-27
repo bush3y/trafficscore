@@ -290,7 +290,7 @@
   <div class="legend-row"><div class="legend-swatch" style="background:#22c55e"></div> 0–20 Very quiet</div>
   <div class="legend-row"><div class="legend-swatch" style="background:#facc15"></div> 20–35 Quiet</div>
   <div class="legend-row"><div class="legend-swatch" style="background:#fb923c"></div> 35–65 Moderate</div>
-  <div class="legend-row"><div class="legend-swatch" style="background:#b91c1c"></div> 65+ Busy/concerning</div>
+  <div class="legend-row"><div class="legend-swatch" style="background:#dc2626"></div> 65+ Busy/concerning</div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -311,7 +311,7 @@
     if (score < 20)  return "#22c55e";
     if (score < 35)  return "#facc15";
     if (score < 65)  return "#fb923c";
-    return "#b91c1c";
+    return "#dc2626";
   }
 
   function scoreLabel(score) {
