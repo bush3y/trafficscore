@@ -61,8 +61,28 @@ def run():
             b  text;
         BEGIN
             IF name1 IS NULL OR name2 IS NULL THEN RETURN FALSE; END IF;
-            w1 := string_to_array(lower(name1), ' ');
-            w2 := string_to_array(lower(name2), ' ');
+            -- Expand abbreviations that fail prefix matching.
+            -- Ave/St/Dr/Cres already work via prefix; these don't:
+            --   Rd   ≠ prefix of Road    (road LIKE rd%   = false)
+            --   Pky/Pkwy ≠ prefix of Parkway
+            --   Blvd ≠ prefix of Boulevard
+            --   Hwy  ≠ prefix of Highway
+            w1 := string_to_array(
+                regexp_replace(regexp_replace(regexp_replace(regexp_replace(
+                    lower(name1),
+                    '\mrd\M',         'road',      'g'),
+                    '\m(pkwy|pky)\M', 'parkway',   'g'),
+                    '\mblvd\M',       'boulevard', 'g'),
+                    '\mhwy\M',        'highway',   'g'),
+                ' ');
+            w2 := string_to_array(
+                regexp_replace(regexp_replace(regexp_replace(regexp_replace(
+                    lower(name2),
+                    '\mrd\M',         'road',      'g'),
+                    '\m(pkwy|pky)\M', 'parkway',   'g'),
+                    '\mblvd\M',       'boulevard', 'g'),
+                    '\mhwy\M',        'highway',   'g'),
+                ' ');
             n  := LEAST(array_length(w1, 1), array_length(w2, 1));
             FOR i IN 1..n LOOP
                 a := w1[i]; b := w2[i];
