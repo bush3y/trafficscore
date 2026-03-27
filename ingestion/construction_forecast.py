@@ -66,6 +66,13 @@ def run():
                     (objectid, layer, feature_type, status, targeted_start, project_webpage, geometry, pulled_at)
                 VALUES (%s, %s, %s, %s, %s, %s,
                     ST_SetSRID(ST_GeomFromGeoJSON(%s), 4326), %s)
+                ON CONFLICT (objectid, layer) DO UPDATE SET
+                    feature_type    = EXCLUDED.feature_type,
+                    status          = EXCLUDED.status,
+                    targeted_start  = EXCLUDED.targeted_start,
+                    project_webpage = EXCLUDED.project_webpage,
+                    geometry        = EXCLUDED.geometry,
+                    pulled_at       = EXCLUDED.pulled_at
             """, [
                 props.get("OBJECTID"),
                 layer_name,

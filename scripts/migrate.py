@@ -49,6 +49,23 @@ MIGRATIONS = [
         CREATE INDEX IF NOT EXISTS construction_forecast_geom_idx
             ON construction_forecast USING GIST(geometry);
     """),
+    ("construction_forecast fix pk", """
+        DROP TABLE IF EXISTS construction_forecast;
+        CREATE TABLE construction_forecast (
+            id              SERIAL PRIMARY KEY,
+            objectid        INTEGER NOT NULL,
+            layer           TEXT NOT NULL,
+            UNIQUE (objectid, layer),
+            feature_type    TEXT,
+            status          TEXT,
+            targeted_start  TEXT,
+            project_webpage TEXT,
+            geometry        GEOMETRY(Geometry, 4326),
+            pulled_at       TIMESTAMPTZ DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS construction_forecast_geom_idx
+            ON construction_forecast USING GIST(geometry);
+    """),
     ("development_applications table", """
         CREATE TABLE IF NOT EXISTS development_applications (
             objectid           INTEGER PRIMARY KEY,
