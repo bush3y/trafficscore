@@ -67,21 +67,29 @@ def run():
             --   Pky/Pkwy ≠ prefix of Parkway
             --   Blvd ≠ prefix of Boulevard
             --   Hwy  ≠ prefix of Highway
+            --   Drwy ≠ prefix of Driveway (Queen Elizabeth Driveway)
+            --   Pvt  ≠ prefix of Private  (many Ottawa private roads)
             w1 := string_to_array(
                 regexp_replace(regexp_replace(regexp_replace(regexp_replace(
+                regexp_replace(regexp_replace(
                     lower(name1),
                     '\mrd\M',         'road',      'g'),
                     '\m(pkwy|pky)\M', 'parkway',   'g'),
                     '\mblvd\M',       'boulevard', 'g'),
                     '\mhwy\M',        'highway',   'g'),
+                    '\mdrwy\M',       'driveway',  'g'),
+                    '\mpvt\M',        'private',   'g'),
                 ' ');
             w2 := string_to_array(
                 regexp_replace(regexp_replace(regexp_replace(regexp_replace(
+                regexp_replace(regexp_replace(
                     lower(name2),
                     '\mrd\M',         'road',      'g'),
                     '\m(pkwy|pky)\M', 'parkway',   'g'),
                     '\mblvd\M',       'boulevard', 'g'),
                     '\mhwy\M',        'highway',   'g'),
+                    '\mdrwy\M',       'driveway',  'g'),
+                    '\mpvt\M',        'private',   'g'),
                 ' ');
             n  := LEAST(array_length(w1, 1), array_length(w2, 1));
             FOR i IN 1..n LOOP
