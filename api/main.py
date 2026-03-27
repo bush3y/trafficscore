@@ -524,6 +524,202 @@ def admin_status():
     }
 
 
+@app.get("/api/validation")
+def validation():
+    """Volume score vs measured traffic count correlation + outliers."""
+    conn = get_conn()
+    cur = conn.cursor()
+
+    # Spearman correlation by road class
+    cur.execute("""
+        WITH latest_volumes AS (
+            SELECT DISTINCT ON (intersection_name)
+                intersection_name, volume, geometry
+            FROM intersection_volumes
+            ORDER BY intersection_name, year DESC
+        ),
+        segment_vs_count AS (
+            SELECT DISTINCT ON (rs.id)
+                rs.id,
+                rs.name,
+                rs.road_class,
+                ss.volume_score,
+                lv.volume AS measured_volume,
+                lv.intersection_name
+            FROM latest_volumes lv
+            JOIN road_segments rs ON ST_DWithin(rs.geometry, lv.geometry, 0.0005)
+            JOIN street_scores ss ON ss.segment_id = rs.id
+            WHERE ss.volume_score IS NOT NULL
+            ORDER BY rs.id, ST_Distance(rs.geometry, lv.geometry)
+        ),
+        ranked AS (
+            SELECT *,
+                PERCENT_RANK() OVER (ORDER BY volume_score)    AS rank_score,
+                PERCENT_RANK() OVER (ORDER BY measured_volume) AS rank_measured
+            FROM segment_vs_count
+        )
+        SELECT
+            road_class,
+            COUNT(*)                                                          AS pairs,
+            ROUND(CORR(rank_score, rank_measured)::numeric, 3)               AS spearman,
+            COUNT(*) FILTER (WHERE ABS(rank_score - rank_measured) > 0.4)    AS large_mismatch,
+            ROUND(AVG(volume_score)::numeric, 1)                             AS avg_vol_score,
+            ROUND(AVG(measured_volume)::numeric, 0)                          AS avg_measured
+        FROM ranked
+        GROUP BY road_class
+        HAVING COUNT(*) >= 10
+        ORDER BY spearman DESC
+    """)
+    correlations = [dict(r) for r in cur.fetchall()]
+
+    # Top outliers: scored HIGH but measured LOW (overscored)
+    cur.execute("""
+        WITH latest_volumes AS (
+            SELECT DISTINCT ON (intersection_name)
+                intersection_name, volume, geometry
+            FROM intersection_volumes
+            ORDER BY intersection_name, year DESC
+        ),
+        segment_vs_count AS (
+            SELECT DISTINCT ON (rs.id)
+                rs.id,
+                rs.name,
+                rs.road_class,
+                ss.volume_score,
+                ss.composite_score,
+                lv.volume          AS measured_volume,
+                lv.intersection_name
+            FROM latest_volumes lv
+            JOIN road_segments rs ON ST_DWithin(rs.geometry, lv.geometry, 0.0005)
+            JOIN street_scores ss ON ss.segment_id = rs.id
+            WHERE ss.volume_score IS NOT NULL
+            ORDER BY rs.id, ST_Distance(rs.geometry, lv.geometry)
+        ),
+        ranked AS (
+            SELECT *,
+                PERCENT_RANK() OVER (ORDER BY volume_score)    AS rank_score,
+                PERCENT_RANK() OVER (ORDER BY measured_volume) AS rank_measured
+            FROM segment_vs_count
+        )
+        SELECT
+            id::text, name, road_class,
+            ROUND(volume_score::numeric, 1)    AS volume_score,
+            ROUND(composite_score::numeric, 1) AS composite_score,
+            measured_volume,
+            intersection_name,
+            ROUND((rank_score    * 100)::numeric, 1) AS pct_rank_score,
+            ROUND((rank_measured * 100)::numeric, 1) AS pct_rank_measured,
+            ROUND(((rank_score - rank_measured) * 100)::numeric, 1) AS rank_gap
+        FROM ranked
+        WHERE rank_score - rank_measured > 0.4
+        ORDER BY rank_gap DESC
+        LIMIT 40
+    """)
+    overscored = [dict(r) for r in cur.fetchall()]
+
+    # Top outliers: scored LOW but measured HIGH (underscored)
+    cur.execute("""
+        WITH latest_volumes AS (
+            SELECT DISTINCT ON (intersection_name)
+                intersection_name, volume, geometry
+            FROM intersection_volumes
+            ORDER BY intersection_name, year DESC
+        ),
+        segment_vs_count AS (
+            SELECT DISTINCT ON (rs.id)
+                rs.id,
+                rs.name,
+                rs.road_class,
+                ss.volume_score,
+                ss.composite_score,
+                lv.volume          AS measured_volume,
+                lv.intersection_name
+            FROM latest_volumes lv
+            JOIN road_segments rs ON ST_DWithin(rs.geometry, lv.geometry, 0.0005)
+            JOIN street_scores ss ON ss.segment_id = rs.id
+            WHERE ss.volume_score IS NOT NULL
+            ORDER BY rs.id, ST_Distance(rs.geometry, lv.geometry)
+        ),
+        ranked AS (
+            SELECT *,
+                PERCENT_RANK() OVER (ORDER BY volume_score)    AS rank_score,
+                PERCENT_RANK() OVER (ORDER BY measured_volume) AS rank_measured
+            FROM segment_vs_count
+        )
+        SELECT
+            id::text, name, road_class,
+            ROUND(volume_score::numeric, 1)    AS volume_score,
+            ROUND(composite_score::numeric, 1) AS composite_score,
+            measured_volume,
+            intersection_name,
+            ROUND((rank_score    * 100)::numeric, 1) AS pct_rank_score,
+            ROUND((rank_measured * 100)::numeric, 1) AS pct_rank_measured,
+            ROUND(((rank_measured - rank_score) * 100)::numeric, 1) AS rank_gap
+        FROM ranked
+        WHERE rank_measured - rank_score > 0.4
+        ORDER BY rank_gap DESC
+        LIMIT 40
+    """)
+    underscored = [dict(r) for r in cur.fetchall()]
+
+    # Safety cross-validation: compare 2019-2022 collision density vs 2023-2024 collision density
+    # Streets that were high-safety in early period should still be high in later period
+    cur.execute("""
+        WITH nearest_segment AS (
+            SELECT DISTINCT ON (c.id)
+                c.id         AS collision_id,
+                rs.id        AS segment_id,
+                rs.name,
+                rs.road_class,
+                c.year
+            FROM collisions c
+            JOIN road_segments rs ON ST_DWithin(rs.geometry, c.geometry, 0.000135)
+            ORDER BY c.id, c.geometry <-> rs.geometry
+        ),
+        lengths AS (
+            SELECT id, GREATEST(ST_Length(geometry::geography) / 1000.0, 0.05) AS km
+            FROM road_segments
+        ),
+        early AS (
+            SELECT segment_id, COUNT(*) AS hits
+            FROM nearest_segment WHERE year BETWEEN 2019 AND 2021 GROUP BY segment_id
+        ),
+        late AS (
+            SELECT segment_id, COUNT(*) AS hits
+            FROM nearest_segment WHERE year BETWEEN 2022 AND 2024 GROUP BY segment_id
+        )
+        SELECT
+            COUNT(*) FILTER (WHERE e.hits >= 2 AND l.hits >= 2)        AS both_active,
+            COUNT(*) FILTER (WHERE e.hits >= 2 AND l.hits IS NULL)      AS went_quiet,
+            COUNT(*) FILTER (WHERE e.hits IS NULL AND l.hits >= 2)      AS newly_dangerous,
+            ROUND(CORR(
+                COALESCE(e.hits, 0)::float / ln.km,
+                COALESCE(l.hits, 0)::float / ln.km
+            )::numeric, 3) AS density_correlation
+        FROM road_segments rs
+        JOIN lengths ln ON ln.id = rs.id
+        LEFT JOIN early e ON e.segment_id = rs.id
+        LEFT JOIN late  l ON l.segment_id = rs.id
+        WHERE e.hits IS NOT NULL OR l.hits IS NOT NULL
+    """)
+    safety_xval = dict(cur.fetchone())
+
+    cur.close()
+    conn.close()
+
+    return {
+        "correlations": correlations,
+        "overscored": overscored,
+        "underscored": underscored,
+        "safety_xval": safety_xval,
+    }
+
+
+@app.get("/validation")
+def validation_page():
+    return FileResponse("frontend/validation.html")
+
+
 @app.get("/admin")
 def admin_page():
     return FileResponse("frontend/admin.html")

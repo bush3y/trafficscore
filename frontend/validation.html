@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TrafficScore — Model Validation</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f5f5; color: #222; padding: 32px 24px; }
+    h1 { font-size: 1.2rem; font-weight: 700; margin-bottom: 4px; }
+    .subtitle { font-size: 0.85rem; color: #888; margin-bottom: 8px; }
+    .nav { font-size: 0.82rem; margin-bottom: 28px; }
+    .nav a { color: #3b82f6; text-decoration: none; }
+    .nav a:hover { text-decoration: underline; }
+
+    h2 { font-size: 0.95rem; font-weight: 600; margin: 28px 0 10px; }
+    .section-note { font-size: 0.8rem; color: #888; margin-bottom: 12px; }
+
+    table { width: 100%; border-collapse: collapse; background: white; border-radius: 10px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08); font-size: 0.83rem; overflow: hidden; }
+    thead th { background: #f8f8f8; padding: 9px 12px; text-align: left; font-weight: 600;
+               color: #555; border-bottom: 1px solid #eee; white-space: nowrap; }
+    thead th.r { text-align: right; }
+    tbody td { padding: 8px 12px; border-bottom: 1px solid #f4f4f4; vertical-align: middle; }
+    tbody td.r { text-align: right; font-variant-numeric: tabular-nums; }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background: #fafafa; }
+
+    .bar-cell { width: 120px; }
+    .bar-wrap { display: flex; align-items: center; gap: 6px; }
+    .bar-bg { flex: 1; height: 6px; background: #eee; border-radius: 3px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 3px; }
+    .bar-label { font-size: 0.78rem; color: #555; width: 34px; text-align: right; flex-shrink: 0; }
+
+    .gap-pill { display: inline-block; padding: 1px 7px; border-radius: 10px;
+                font-size: 0.78rem; font-weight: 600; }
+    .gap-over  { background: #fee2e2; color: #b91c1c; }
+    .gap-under { background: #dbeafe; color: #1d4ed8; }
+
+    .score-badge { display: inline-block; padding: 1px 7px; border-radius: 10px;
+                   font-size: 0.78rem; font-weight: 600; }
+    .s0  { background: #dcfce7; color: #166534; }
+    .s20 { background: #fef9c3; color: #713f12; }
+    .s35 { background: #ffedd5; color: #9a3412; }
+    .s65 { background: #fee2e2; color: #991b1b; }
+
+    .stat-row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 4px; }
+    .stat-card { background: white; border-radius: 10px; padding: 16px 20px;
+                 box-shadow: 0 1px 4px rgba(0,0,0,0.08); min-width: 160px; }
+    .stat-label { font-size: 0.78rem; color: #888; margin-bottom: 4px; }
+    .stat-value { font-size: 1.3rem; font-weight: 700; }
+    .stat-sub   { font-size: 0.75rem; color: #aaa; margin-top: 2px; }
+
+    .loading { color: #aaa; font-size: 0.88rem; padding: 20px 0; }
+    .error   { color: #ef4444; font-size: 0.88rem; padding: 20px 0; }
+    .footer  { margin-top: 32px; font-size: 0.78rem; color: #aaa; }
+
+    .dim { color: #bbb; }
+  </style>
+</head>
+<body>
+  <h1>TrafficScore Ottawa — Model Validation</h1>
+  <div class="subtitle">Compares volume scores against City of Ottawa measured traffic counts, and checks safety score stability over time.</div>
+  <div class="nav"><a href="/admin">← Data Status</a></div>
+
+  <div id="content"><div class="loading">Loading…</div></div>
+  <div class="footer" id="footer"></div>
+
+  <script>
+    function scoreBadge(s) {
+      if (s === null || s === undefined) return '<span class="dim">—</span>';
+      const n = Number(s);
+      const cls = n >= 65 ? 's65' : n >= 35 ? 's35' : n >= 20 ? 's20' : 's0';
+      return `<span class="score-badge ${cls}">${n}</span>`;
+    }
+
+    function corBar(val) {
+      const pct = Math.round(val * 100);
+      const color = val >= 0.5 ? '#22c55e' : val >= 0.35 ? '#eab308' : '#f97316';
+      return `
+        <div class="bar-wrap">
+          <div class="bar-bg"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>
+          <div class="bar-label">${val.toFixed(3)}</div>
+        </div>`;
+    }
+
+    function num(n) {
+      if (n === null || n === undefined) return '<span class="dim">—</span>';
+      return Number(n).toLocaleString();
+    }
+
+    function renderCorrelations(rows) {
+      const html = rows.map(r => `
+        <tr>
+          <td>${r.road_class}</td>
+          <td class="r">${num(r.pairs)}</td>
+          <td class="bar-cell">${corBar(r.spearman)}</td>
+          <td class="r">${r.large_mismatch} <span class="dim">(${Math.round(r.large_mismatch / r.pairs * 100)}%)</span></td>
+          <td class="r">${r.avg_vol_score}</td>
+          <td class="r">${num(r.avg_measured)}</td>
+        </tr>`).join('');
+      return `
+        <table>
+          <thead><tr>
+            <th>Road class</th>
+            <th class="r">Pairs</th>
+            <th>Spearman ρ</th>
+            <th class="r">Large mismatches (&gt;40 pct pts)</th>
+            <th class="r">Avg vol score</th>
+            <th class="r">Avg measured (vehicles/day)</th>
+          </tr></thead>
+          <tbody>${html}</tbody>
+        </table>`;
+    }
+
+    function renderOutliers(rows, direction) {
+      const pillCls = direction === 'over' ? 'gap-over' : 'gap-under';
+      const html = rows.map(r => `
+        <tr>
+          <td>${r.name || '<span class="dim">unnamed</span>'}</td>
+          <td>${r.road_class}</td>
+          <td class="r">${scoreBadge(r.composite_score)}</td>
+          <td class="r">${r.pct_rank_score}th pct</td>
+          <td class="r">${num(r.measured_volume)}</td>
+          <td class="r">${r.pct_rank_measured}th pct</td>
+          <td class="r"><span class="gap-pill ${pillCls}">+${r.rank_gap} pts</span></td>
+          <td style="font-size:0.78rem;color:#888;">${r.intersection_name}</td>
+        </tr>`).join('');
+      return `
+        <table>
+          <thead><tr>
+            <th>Segment</th>
+            <th>Class</th>
+            <th class="r">Composite</th>
+            <th class="r">Vol score rank</th>
+            <th class="r">Measured volume</th>
+            <th class="r">Measured rank</th>
+            <th class="r">Gap</th>
+            <th>Nearest count location</th>
+          </tr></thead>
+          <tbody>${html}</tbody>
+        </table>`;
+    }
+
+    fetch('/api/validation')
+      .then(r => r.json())
+      .then(d => {
+        const xv = d.safety_xval;
+        const content = `
+          <h2>Volume Score vs Measured Traffic Counts</h2>
+          <div class="section-note">
+            Each road segment matched to the nearest City of Ottawa intersection volume count within 55m.
+            Spearman ρ compares our TomTom-based volume rank against measured vehicle counts.
+            Pairs are deduplicated per segment (nearest count only).
+          </div>
+          ${renderCorrelations(d.correlations)}
+
+          <h2>Safety Score Stability (2019–2021 vs 2022–2024)</h2>
+          <div class="section-note">
+            Checks whether streets that had collisions in the early period still had collisions in the later period.
+            A high correlation here means safety scores reflect persistent conditions, not random noise.
+          </div>
+          <div class="stat-row">
+            <div class="stat-card">
+              <div class="stat-label">Density correlation</div>
+              <div class="stat-value">${xv.density_correlation}</div>
+              <div class="stat-sub">early vs late collision density</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Active both periods</div>
+              <div class="stat-value">${num(xv.both_active)}</div>
+              <div class="stat-sub">≥2 collisions in each half</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Went quiet</div>
+              <div class="stat-value">${num(xv.went_quiet)}</div>
+              <div class="stat-sub">active 2019–21, silent 2022–24</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Newly dangerous</div>
+              <div class="stat-value">${num(xv.newly_dangerous)}</div>
+              <div class="stat-sub">silent 2019–21, active 2022–24</div>
+            </div>
+          </div>
+
+          <h2>Overscored Segments <span style="font-weight:400;color:#888;font-size:0.82rem;">— volume score much higher than measured count suggests</span></h2>
+          <div class="section-note">
+            These segments have a high TomTom-based volume score but a relatively low measured traffic count nearby.
+            Could indicate TomTom probe bias, spatial mismatch between the segment and count location, or legitimate data gaps.
+          </div>
+          ${renderOutliers(d.overscored, 'over')}
+
+          <h2>Underscored Segments <span style="font-weight:400;color:#888;font-size:0.82rem;">— volume score much lower than measured count suggests</span></h2>
+          <div class="section-note">
+            These segments have a low TomTom-based volume score but a high measured traffic count nearby.
+            Could indicate TomTom coverage gaps (few probes on this road), or the count location being on a different nearby road.
+          </div>
+          ${renderOutliers(d.underscored, 'under')}
+        `;
+        document.getElementById('content').innerHTML = content;
+        document.getElementById('footer').textContent = `Loaded at ${new Date().toLocaleTimeString()}`;
+      })
+      .catch(() => {
+        document.getElementById('content').innerHTML = '<div class="error">Failed to load — is the API running?</div>';
+      });
+  </script>
+</body>
+</html>
