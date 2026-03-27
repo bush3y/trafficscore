@@ -289,8 +289,8 @@
   <h4>Street score (lower = better)</h4>
   <div class="legend-row"><div class="legend-swatch" style="background:#22c55e"></div> 0–20 Very quiet</div>
   <div class="legend-row"><div class="legend-swatch" style="background:#facc15"></div> 20–35 Quiet</div>
-  <div class="legend-row"><div class="legend-swatch" style="background:#f97316"></div> 35–65 Moderate</div>
-  <div class="legend-row"><div class="legend-swatch" style="background:#ef4444"></div> 65+ Busy/concerning</div>
+  <div class="legend-row"><div class="legend-swatch" style="background:#fb923c"></div> 35–65 Moderate</div>
+  <div class="legend-row"><div class="legend-swatch" style="background:#b91c1c"></div> 65+ Busy/concerning</div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -310,8 +310,8 @@
     if (score === null || score === undefined) return "#aaa";
     if (score < 20)  return "#22c55e";
     if (score < 35)  return "#facc15";
-    if (score < 65)  return "#f97316";
-    return "#ef4444";
+    if (score < 65)  return "#fb923c";
+    return "#b91c1c";
   }
 
   function scoreLabel(score) {

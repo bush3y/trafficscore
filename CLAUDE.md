@@ -117,6 +117,17 @@ Motorways and trunk roads are included in `road_segments` so highway collisions 
 
 Note: segment count increased from ~32k to ~46k after motorways/trunk added to OSM ingestion. The very-quiet band is larger because motorway-adjacent residential streets no longer inherit highway collision/volume data.
 
+## Model Validation Dashboard (`/validation`)
+The validation page at `/validation` cross-references TomTom volume scores against City of Ottawa intersection vehicle counts. It shows Spearman rank correlation by road class, safety cross-validation stats, and outlier tables (overscored / underscored segments).
+
+**Documenting investigated outliers**: When an outlier is researched and explained, add it to the `RESEARCHED` object in `frontend/validation.html`. Use:
+- `kind: 'reviewed'` — a specific road where we investigated and confirmed the score is correct or explained the discrepancy
+- `kind: 'pattern'` — a systematic category (e.g. downtown one-way bus corridors inflated by OC Transpo GPS probes)
+
+Each entry gets a hover tooltip (`reason`) explaining what was found. Reviewed rows are tinted green, pattern rows tinted blue. This lets future reviewers distinguish noise from real model issues at a glance.
+
+**Always add a RESEARCHED entry when**: investigating an outlier on this dashboard, diagnosing an unusual score on the map, or identifying a known data quirk that causes systematic bias for a road or road type.
+
 ## Pending / Future Ideas
 - **Neighbourhood browse**: search by neighbourhood name ("Westboro") and get aggregate score card
 - **TomTom refresh**: trial was August 2024 only. Paid plan would allow monthly/quarterly refresh. HERE Traffic Analytics is an alternative but requires new ingestion script + segment matching logic.
