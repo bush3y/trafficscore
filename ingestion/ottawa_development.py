@@ -24,6 +24,7 @@ import re
 from datetime import datetime, timezone
 
 import psycopg2
+from psycopg2.extras import execute_values
 import requests
 from dotenv import load_dotenv
 
@@ -200,24 +201,28 @@ def run():
     try:
         ottwatch = fetch_ottwatch()
         print(f"  {len(ottwatch)} OttWatch entries loaded.")
-        enriched = 0
-        for app_number, data in ottwatch.items():
-            description = data["description"]
-            storeys = extract_storeys(description)
-            unit_count = extract_units(description)
-            cur.execute("""
-                UPDATE development_applications
-                SET description = %s,
-                    storeys = %s,
-                    unit_count = %s,
-                    ottwatch_url = %s
-                WHERE application_number = %s
-            """, [description, storeys, unit_count, data["url"], app_number])
-            if cur.rowcount:
-                enriched += 1
+        rows = [
+            (app_number, data["description"],
+             extract_storeys(data["description"]),
+             extract_units(data["description"]),
+             data["url"])
+            for app_number, data in ottwatch.items()
+        ]
+        execute_values(cur, """
+            UPDATE development_applications SET
+                description  = v.description,
+                storeys      = v.storeys::smallint,
+                unit_count   = v.unit_count::int,
+                ottwatch_url = v.url
+            FROM (VALUES %s) AS v(app_number, description, storeys, unit_count, url)
+            WHERE application_number = v.app_number
+        """, rows)
+        cur.execute("SELECT COUNT(*) FROM development_applications WHERE description IS NOT NULL")
+        enriched = cur.fetchone()[0]
         conn.commit()
         print(f"  {enriched} records enriched with OttWatch data.")
     except Exception as e:
+        conn.rollback()
         print(f"  OttWatch enrichment failed (non-fatal): {e}")
 
     cur.close()

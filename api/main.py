@@ -564,15 +564,13 @@ def get_development_activity(
                 COALESCE(NULLIF(project_webpage, ''), objectid::text) AS project_key
             FROM construction_forecast
             WHERE ST_DWithin(geometry::geography, ST_MakePoint(%s, %s)::geography, %s)
-              AND feature_type IN (
-                'RRSW', 'RD_RESF', 'RD_SURF', 'RD_SWRE', 'RD_CS',
-                'RS', 'RSL', 'RWM', 'SCR', 'SWM', 'SBR', 'WBO',
-                'MIM', 'GNR', 'MS', 'RSS', 'CREN', 'RD_MUPR'
-              )
-              OR (
-                feature_type = 'GNT'
-                AND project_webpage IS NOT NULL AND project_webpage != ''
-                AND ST_DWithin(geometry::geography, ST_MakePoint(%s, %s)::geography, %s)
+              AND (
+                feature_type IN (
+                  'RRSW', 'RD_RESF', 'RD_SURF', 'RD_SWRE', 'RD_CS',
+                  'RS', 'RSL', 'RWM', 'SCR', 'SWM', 'SBR', 'WBO',
+                  'MIM', 'GNR', 'MS', 'RSS', 'CREN', 'RD_MUPR'
+                )
+                OR (feature_type = 'GNT' AND project_webpage IS NOT NULL AND project_webpage != '')
               )
         ),
         deduped AS (
@@ -592,7 +590,7 @@ def get_development_activity(
         SELECT * FROM deduped
         ORDER BY distance_m
         LIMIT 10
-    """, [lng, lat, radius_m, lng, lat, radius_m, lng, lat, lng, lat])
+    """, [lng, lat, radius_m, lng, lat, lng, lat])
     construction = [dict(r) for r in cur.fetchall()]
 
     # Completed/terminal statuses excluded — only active/pending applications shown.
