@@ -408,35 +408,43 @@
     const { construction, development } = data;
     if (!construction.length && !development.length) return "";
 
-    const lines = [];
+    const typeLabel = t =>
+      t === "Plan of Condominium"    ? "Condo plan"  :
+      t === "Site Plan Control"      ? "Site plan"   :
+      t === "Official Plan Amendment"? "OPA"         :
+      t === "Zoning By-law Amendment"? "Rezoning"    :
+      t === "Plan of Subdivision"    ? "Subdivision" :
+      t;
+
+    let html = `<div style="font-weight:600;margin-bottom:6px;">🚧 Nearby activity</div>`;
 
     if (construction.length) {
       const thisYear = construction.filter(c => c.targeted_start === "This Year").length;
       let txt = `City construction: ${construction.length} project${construction.length > 1 ? "s" : ""} within 500m`;
       if (thisYear) txt += ` (${thisYear} this year)`;
-      lines.push(txt);
+      html += `<div>${txt}</div>`;
     }
 
     if (development.length) {
-      const counts = {};
+      html += `<div style="margin-top:6px;font-weight:500;">Planning applications nearby:</div>`;
       for (const d of development) {
-        const short = d.application_type === "Plan of Condominium"   ? "condo plan"  :
-                      d.application_type === "Site Plan Control"      ? "site plan"   :
-                      d.application_type === "Official Plan Amendment" ? "OPA"         :
-                      d.application_type === "Zoning By-law Amendment"? "rezoning"    :
-                      d.application_type === "Plan of Subdivision"    ? "subdivision" :
-                      d.application_type;
-        counts[short] = (counts[short] || 0) + 1;
+        const label = typeLabel(d.application_type);
+        const addr = d.address || "";
+        let meta = [];
+        if (d.storeys) meta.push(`${d.storeys} storeys`);
+        if (d.unit_count) meta.push(`~${d.unit_count} units`);
+        const metaStr = meta.length ? ` · <span style="color:#b45309;">${meta.join(", ")}</span>` : "";
+        const linkStr = d.ottwatch_url
+          ? ` <a href="${d.ottwatch_url}" target="_blank" rel="noopener" style="color:#9a3412;text-decoration:underline;">details ↗</a>`
+          : "";
+        const distStr = d.distance_m != null ? ` <span style="color:#bbb;">${d.distance_m}m</span>` : "";
+        html += `<div style="margin-top:3px;">${label}: ${addr}${metaStr}${distStr}${linkStr}</div>`;
       }
-      const typeStr = Object.entries(counts)
-        .map(([t, n]) => n > 1 ? `${n} ${t}s` : t).join(", ");
-      lines.push(`Development applications: ${development.length} within 500m (${typeStr})`);
     }
 
     return `
       <div style="margin-top:12px;padding:10px 12px;background:#fff7ed;border-left:3px solid #fb923c;border-radius:8px;font-size:0.82rem;color:#444;">
-        <div style="font-weight:600;margin-bottom:6px;">🚧 Nearby activity</div>
-        ${lines.map(l => `<div>${l}</div>`).join("")}
+        ${html}
       </div>`;
   }
 
