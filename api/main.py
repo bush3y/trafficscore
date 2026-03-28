@@ -548,20 +548,56 @@ def get_development_activity(
     conn = get_conn()
     cur = conn.cursor()
 
+    # Feature types that represent street-level disruption relevant to home buyers.
+    # Excludes facilities/parks/transit-infrastructure (OBLDG, OPARKS, GNP, etc.).
+    # GNT (New Transit) included only when project_webpage is set — proxy for major projects (e.g. LRT).
     cur.execute("""
-        SELECT
-            feature_type,
-            status,
-            targeted_start,
-            project_webpage,
-            ROUND(ST_Distance(geometry::geography, ST_MakePoint(%s, %s)::geography)::numeric) AS distance_m
-        FROM construction_forecast
-        WHERE ST_DWithin(geometry::geography, ST_MakePoint(%s, %s)::geography, %s)
+        WITH relevant AS (
+            SELECT
+                feature_type,
+                status,
+                targeted_start,
+                project_webpage,
+                traffic_impacts,
+                geometry,
+                COALESCE(NULLIF(project_webpage, ''), objectid::text) AS project_key
+            FROM construction_forecast
+            WHERE ST_DWithin(geometry::geography, ST_MakePoint(%s, %s)::geography, %s)
+              AND feature_type IN (
+                'RRSW', 'RD_RESF', 'RD_SURF', 'RD_SWRE', 'RD_CS',
+                'RS', 'RSL', 'RWM', 'SCR', 'SWM', 'SBR', 'WBO',
+                'MIM', 'GNR', 'MS', 'RSS', 'CREN', 'RD_MUPR'
+              )
+              OR (
+                feature_type = 'GNT'
+                AND project_webpage IS NOT NULL AND project_webpage != ''
+                AND ST_DWithin(geometry::geography, ST_MakePoint(%s, %s)::geography, %s)
+              )
+        ),
+        deduped AS (
+            SELECT DISTINCT ON (project_key)
+                feature_type,
+                status,
+                targeted_start,
+                project_webpage,
+                CASE WHEN traffic_impacts ~* '^\s*(none|no[\s.]|no$|n/?a|na)\s*'
+                     THEN NULL ELSE traffic_impacts END AS traffic_impacts,
+                ROUND(ST_Distance(geometry::geography, ST_MakePoint(%s, %s)::geography)::numeric) AS distance_m,
+                COUNT(*) OVER (PARTITION BY project_key) AS segment_count,
+                ROUND(SUM(ST_Length(geometry::geography)) OVER (PARTITION BY project_key)::numeric) AS total_length_m
+            FROM relevant
+            ORDER BY project_key, ST_Distance(geometry::geography, ST_MakePoint(%s, %s)::geography)
+        )
+        SELECT * FROM deduped
         ORDER BY distance_m
         LIMIT 10
-    """, [lng, lat, lng, lat, radius_m])
+    """, [lng, lat, radius_m, lng, lat, radius_m, lng, lat, lng, lat])
     construction = [dict(r) for r in cur.fetchall()]
 
+    # Completed/terminal statuses excluded — only active/pending applications shown.
+    # "Agreement Registered - Securities Held" kept: developer obligations still outstanding.
+    # "Application Approved by OMB" kept: bylaw enactment and construction still pending.
+    # Null status excluded: unknown state.
     cur.execute("""
         SELECT
             application_number,
@@ -572,6 +608,21 @@ def get_development_activity(
             ROUND(ST_Distance(geometry::geography, ST_MakePoint(%s, %s)::geography)::numeric) AS distance_m
         FROM development_applications
         WHERE ST_DWithin(geometry::geography, ST_MakePoint(%s, %s)::geography, %s)
+          AND status IS NOT NULL
+          AND status NOT ILIKE '%%in effect%%'
+          AND status NOT IN (
+            'Agreement Registered - Final Legal Clearance Given',
+            'No Appeal - Official Plan Amendment Adopted',
+            'OMB Appeal Withdrawn - Application Approved',
+            'Application Refused by OMB',
+            'By-law Refused',
+            'Approval Lapsed - No Building Permit Issued',
+            'Agreement lapsed',
+            'Application Approved - No Agreement/Letter of Undertaking Required',
+            'Application Approved: No Agreement/Letter of Undertaking Required',
+            'Approved - Agreement Signed, Registration Not Required',
+            'CWN approved'
+          )
         ORDER BY distance_m
         LIMIT 10
     """, [lng, lat, lng, lat, radius_m])

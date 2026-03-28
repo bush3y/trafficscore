@@ -32,7 +32,7 @@ def fetch_layer(layer_id):
         f"{BASE_URL}/{layer_id}/query",
         params={
             "where": "1=1",
-            "outFields": "OBJECTID,FEATURE_TYPE,STATUS,TARGETED_START,PROJECTWEBPAGE",
+            "outFields": "OBJECTID,FEATURE_TYPE,STATUS,TARGETED_START,PROJECTWEBPAGE,TRAFFICIMPACTS",
             "outSR": "4326",
             "f": "geojson",
         },
@@ -47,6 +47,7 @@ def run():
     conn = psycopg2.connect(DATABASE_URL)
     cur = conn.cursor()
 
+    cur.execute("ALTER TABLE construction_forecast ADD COLUMN IF NOT EXISTS traffic_impacts text")
     cur.execute("TRUNCATE TABLE construction_forecast")
 
     total = 0
@@ -63,14 +64,15 @@ def run():
 
             cur.execute("""
                 INSERT INTO construction_forecast
-                    (objectid, layer, feature_type, status, targeted_start, project_webpage, geometry, pulled_at)
-                VALUES (%s, %s, %s, %s, %s, %s,
+                    (objectid, layer, feature_type, status, targeted_start, project_webpage, traffic_impacts, geometry, pulled_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s,
                     ST_SetSRID(ST_GeomFromGeoJSON(%s), 4326), %s)
                 ON CONFLICT (objectid, layer) DO UPDATE SET
                     feature_type    = EXCLUDED.feature_type,
                     status          = EXCLUDED.status,
                     targeted_start  = EXCLUDED.targeted_start,
                     project_webpage = EXCLUDED.project_webpage,
+                    traffic_impacts = EXCLUDED.traffic_impacts,
                     geometry        = EXCLUDED.geometry,
                     pulled_at       = EXCLUDED.pulled_at
             """, [
@@ -80,6 +82,7 @@ def run():
                 (props.get("STATUS") or "").strip() or None,
                 (props.get("TARGETED_START") or "").strip() or None,
                 (props.get("PROJECTWEBPAGE") or "").strip() or None,
+                (props.get("TRAFFICIMPACTS") or "").strip() or None,
                 json.dumps(geom),
                 pulled_at,
             ])

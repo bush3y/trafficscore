@@ -110,6 +110,12 @@
 
       // Underscored — TomTom coverage gaps on specific roads
       'Basil Macdonald Way': { kind: 'reviewed', reason: 'Tertiary road with high city count (39k). Low TomTom probe coverage — road may be relatively new or not well-represented in TomTom\'s probe dataset.' },
+
+      // Underscored — school-adjacent cut-through, August data blind spot
+      'Rembrandt Road':      { kind: 'pattern',  reason: 'Residential street adjacent to a school (Parkhaven Ave area). Anecdotally used as a cut-through to Mountainview Avenue during school runs. TomTom data is from August 2024 (summer holidays) — term-time cut-through traffic would be absent. Compounded by sparse TomTom probe coverage on Rembrandt itself; Mountainview scores higher partly because it has a high-probe anchor segment that boosts its spatial fallback. Volume score likely understates reality during September–June.' },
+
+      // Safety score inflation — long dead-end spur inheriting arterial collisions
+      'Boundary Road':       { kind: 'pattern',  reason: 'Unclassified dead-end spur (1.3km) off secondary Boundary Road. Safety score of 71 driven by 2 collisions that anchored to the secondary arterial 52–95m from the spur entrance, then spread to the spur via same-name 150m radius. OSM models this as one long segment, so the whole spur inherits the collision — including residents at the far end who are 1.3km+ from the collision points. Known data granularity limitation: fix would require OSM to split the spur into shorter segments.' },
     };
 
     function scoreBadge(s) {
