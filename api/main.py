@@ -543,6 +543,7 @@ def get_development_activity(
     lat: float = Query(...),
     lng: float = Query(...),
     radius_m: int = Query(500),
+    dev_radius_m: int = Query(750),
 ):
     """City construction projects and development applications near a point."""
     conn = get_conn()
@@ -629,7 +630,7 @@ def get_development_activity(
           )
         ORDER BY distance_m
         LIMIT 10
-    """, [lng, lat, lng, lat, radius_m])
+    """, [lng, lat, lng, lat, dev_radius_m])
     development = [dict(r) for r in cur.fetchall()]
 
     cur.close()
