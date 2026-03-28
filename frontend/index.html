@@ -412,7 +412,6 @@
       t === "Plan of Condominium"    ? "Condo plan"  :
       t === "Site Plan Control"      ? "Site plan"   :
       t === "Official Plan Amendment"? "OPA"         :
-      t === "Zoning By-law Amendment"? "Rezoning"    :
       t === "Plan of Subdivision"    ? "Subdivision" :
       t;
 
@@ -434,9 +433,8 @@
         if (d.storeys) meta.push(`${d.storeys} storeys`);
         if (d.unit_count) meta.push(`~${d.unit_count} units`);
         const metaStr = meta.length ? ` · <span style="color:#b45309;">${meta.join(", ")}</span>` : "";
-        const linkStr = d.ottwatch_url
-          ? ` <a href="${d.ottwatch_url}" target="_blank" rel="noopener" style="color:#9a3412;text-decoration:underline;">details ↗</a>`
-          : "";
+        const cityUrl = `https://devapps.ottawa.ca/en/applications/${d.application_number}/details`;
+        const linkStr = ` <a href="${cityUrl}" target="_blank" rel="noopener" style="color:#9a3412;text-decoration:underline;">details ↗</a>`;
         const distStr = d.distance_m != null ? ` <span style="color:#bbb;">${d.distance_m}m</span>` : "";
         html += `<div style="margin-top:3px;">${label}: ${addr}${metaStr}${distStr}${linkStr}</div>`;
       }

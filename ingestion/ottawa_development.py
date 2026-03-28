@@ -90,8 +90,7 @@ def fetch_ottwatch():
         if not app_number:
             continue
         description = (props.get("description") or "").strip() or None
-        url = f"https://ottwatch.ca/devapp/{props.get('id')}" if props.get("id") else None
-        lookup[app_number] = {"description": description, "url": url}
+        lookup[app_number] = {"description": description}
     return lookup
 
 
@@ -138,7 +137,6 @@ def run():
         ("description", "text"),
         ("storeys", "smallint"),
         ("unit_count", "int"),
-        ("ottwatch_url", "text"),
     ]:
         cur.execute(
             f"ALTER TABLE development_applications ADD COLUMN IF NOT EXISTS {col} {col_type}"
@@ -204,17 +202,15 @@ def run():
         rows = [
             (app_number, data["description"],
              extract_storeys(data["description"]),
-             extract_units(data["description"]),
-             data["url"])
+             extract_units(data["description"]))
             for app_number, data in ottwatch.items()
         ]
         execute_values(cur, """
             UPDATE development_applications SET
                 description  = v.description,
                 storeys      = v.storeys::smallint,
-                unit_count   = v.unit_count::int,
-                ottwatch_url = v.url
-            FROM (VALUES %s) AS v(app_number, description, storeys, unit_count, url)
+                unit_count   = v.unit_count::int
+            FROM (VALUES %s) AS v(app_number, description, storeys, unit_count)
             WHERE application_number = v.app_number
         """, rows)
         cur.execute("SELECT COUNT(*) FROM development_applications WHERE description IS NOT NULL")

@@ -141,7 +141,8 @@ Two City of Ottawa datasets surface planning and construction activity near a st
 
 **Development Applications** (`development_applications` table)
 - Planning applications for significant residential development
-- Filtered types: Site Plan Control, Plan of Condominium, Official Plan Amendment, Zoning By-law Amendment, Plan of Subdivision
+- Filtered types: Site Plan Control, Plan of Condominium, Official Plan Amendment, Plan of Subdivision
+- **Zoning By-law Amendments excluded**: too speculative (no approval, no construction timeline, may be small); downstream SPC will surface the actual development when filed
 - Many terminal statuses excluded from API (completed processes, lapsed, refused, by-law in effect); "Agreement Registered - Securities Held" and "Application Approved by OMB" are kept (construction/obligations still pending)
 - Full refresh monthly (paginated at 1,000/page, ~3,500 records)
 - Source: ArcGIS REST API, no auth required

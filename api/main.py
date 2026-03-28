@@ -607,11 +607,11 @@ def get_development_activity(
             description,
             storeys,
             unit_count,
-            ottwatch_url,
             ROUND(ST_Distance(geometry::geography, ST_MakePoint(%s, %s)::geography)::numeric) AS distance_m
         FROM development_applications
         WHERE ST_DWithin(geometry::geography, ST_MakePoint(%s, %s)::geography, %s)
           AND status IS NOT NULL
+          AND application_type != 'Zoning By-law Amendment'
           AND status NOT ILIKE '%%in effect%%'
           AND status NOT IN (
             'Agreement Registered - Final Legal Clearance Given',
