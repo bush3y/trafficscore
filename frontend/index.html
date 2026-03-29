@@ -413,6 +413,7 @@
       t === "Site Plan Control"      ? "Site plan"   :
       t === "Official Plan Amendment"? "OPA"         :
       t === "Plan of Subdivision"    ? "Subdivision" :
+      t === "Demolition Control"     ? "Demolition"  :
       t;
 
     let html = `<div style="font-weight:600;margin-bottom:6px;">🚧 Nearby activity</div>`;
@@ -428,19 +429,15 @@
       html += `<div style="margin-top:6px;font-weight:500;">Planning applications nearby:</div>`;
       for (const d of development) {
         const label = typeLabel(d.application_type);
-        const addr = d.address || "";
-        const meta = [];
-        if (d.storeys)            meta.push(`${d.storeys} storeys`);
-        if (d.unit_count)         meta.push(`${d.unit_count} units`);
-        if (d.gross_floor_area_m2) meta.push(`${d.gross_floor_area_m2.toLocaleString()} m²`);
-        if (d.use_type)           meta.push(d.use_type);
-        if (d.parking_spaces === 0)       meta.push(`no parking`);
-        else if (d.parking_spaces != null) meta.push(`${d.parking_spaces} parking`);
-        const metaStr = meta.length ? ` · <span style="color:#b45309;">${meta.join(' · ')}</span>` : "";
         const cityUrl = `https://devapps.ottawa.ca/en/applications/${d.application_number}/details`;
-        const linkStr = ` <a href="${cityUrl}" target="_blank" rel="noopener" style="color:#9a3412;text-decoration:underline;">details ↗</a>`;
+        const addr = `<a href="${cityUrl}" target="_blank" rel="noopener" style="color:#9a3412;text-decoration:underline;">${d.address || d.application_number}</a>`;
+        const parts = [];
+        if (d.storeys && d.unit_count) parts.push(`${d.storeys} storeys, ${d.unit_count} units`);
+        else if (d.storeys)            parts.push(`${d.storeys} storeys`);
+        else if (d.unit_count)         parts.push(`${d.unit_count} units`);
+        const metaStr = parts.length ? ` · <span style="color:#b45309;">${parts[0]}</span>` : "";
         const distStr = d.distance_m != null ? ` <span style="color:#bbb;">${d.distance_m}m</span>` : "";
-        html += `<div style="margin-top:3px;">${label}: ${addr}${metaStr}${distStr}${linkStr}</div>`;
+        html += `<div style="margin-top:3px;">${label}: ${addr}${metaStr}${distStr}</div>`;
       }
     }
 
