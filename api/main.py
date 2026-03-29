@@ -604,9 +604,6 @@ def get_development_activity(
             status,
             status_date::text AS status_date,
             address,
-            description,
-            storeys,
-            unit_count,
             ROUND(ST_Distance(geometry::geography, ST_MakePoint(%s, %s)::geography)::numeric) AS distance_m
         FROM development_applications
         WHERE ST_DWithin(geometry::geography, ST_MakePoint(%s, %s)::geography, %s)

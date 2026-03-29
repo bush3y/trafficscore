@@ -146,22 +146,12 @@ Two City of Ottawa datasets surface planning and construction activity near a st
 - Many terminal statuses excluded from API (completed processes, lapsed, refused, by-law in effect); "Agreement Registered - Securities Held" and "Application Approved by OMB" are kept (construction/obligations still pending)
 - Full refresh monthly (paginated at 1,000/page, ~3,500 records)
 - Source: ArcGIS REST API, no auth required
-- **OttWatch enrichment**: after City fetch, `ingestion/ottawa_development.py` pulls `ottwatch.ca/devapp/map_data` (~2,141 features) and matches on `application_number` to populate:
-  - `description` — free-text project description
-  - `storeys` — extracted via regex from description
-  - `unit_count` — extracted via regex from description
-  - `ottwatch_url` — link to ottwatch.ca detail page
-  - ~3,500 of 3,538 records enriched on last run (one OttWatch entry can update multiple DB rows for multi-address applications)
-- Application type as proxy for scale when OttWatch data absent:
-  - Plan of Condominium = definitively multi-unit (almost always 20+)
-  - OPA = large-scale intensification
-  - ZBA + SPC at same address = significant rezoning
-  - Standalone SPC alone = weaker signal (10+ units or commercial)
+- Links to `devapps.ottawa.ca/en/applications/{app_number}/details` for full detail (description, documents, history)
 - **Committee of Adjustment** (minor variances) is a separate City system — not in this dataset
 
 **Construction Forecast** (`construction_forecast` table) also includes `traffic_impacts` field (fetched from ArcGIS `TRAFFICIMPACTS` column; "None/N/A" normalized to NULL in API).
 
-**Frontend**: `/api/development-activity?lat=&lng=&radius_m=&dev_radius_m=` — construction uses `radius_m` (default 500m), dev applications use `dev_radius_m` (default 750m, wider because planning activity affects a larger neighbourhood). Surfaced as "🚧 Nearby activity" card showing per-application rows with storey count, unit count, and OttWatch link.
+**Frontend**: `/api/development-activity?lat=&lng=&radius_m=&dev_radius_m=` — construction uses `radius_m` (default 500m), dev applications use `dev_radius_m` (default 750m, wider because planning activity affects a larger neighbourhood). Surfaced as "🚧 Nearby activity" card showing per-application rows with a link to the City of Ottawa detail page.
 
 ## Pending / Future Ideas
 - **Neighbourhood browse**: search by neighbourhood name ("Westboro") and get aggregate score card

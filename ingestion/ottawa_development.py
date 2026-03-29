@@ -6,12 +6,7 @@ Filtered to high-signal types for large residential development:
   - Site Plan Control      (design approval for 10+ unit buildings)
   - Plan of Condominium    (creates individual unit titles — definitively multi-unit)
   - Official Plan Amendment (exceeds OP density limits — almost always large)
-  - Zoning By-law Amendment (rezoning — indicates significant intensification)
   - Plan of Subdivision    (land division for larger development parcels)
-
-After the main fetch, enriches matching records with data from OttWatch
-(ottwatch.ca) — a community index of Ottawa dev applications that includes
-project descriptions with storey counts and unit numbers.
 
 Full refresh on each run (paginated at 1,000 records/page).
 
@@ -20,11 +15,9 @@ Usage:
 """
 
 import os
-import re
 from datetime import datetime, timezone
 
 import psycopg2
-from psycopg2.extras import execute_values
 import requests
 from dotenv import load_dotenv
 
@@ -42,7 +35,6 @@ APP_TYPE_FILTER = (
     "'Site Plan Control',"
     "'Plan of Condominium',"
     "'Official Plan Amendment',"
-    "'Zoning By-law Amendment',"
     "'Plan of Subdivision'"
     ")"
 )
@@ -51,8 +43,6 @@ APP_TYPE_FILTER = (
 EXCLUDE_STATUSES = {"Approval Lapsed"}
 
 PAGE_SIZE = 1000
-
-OTTWATCH_URL = "https://ottwatch.ca/devapp/map_data"
 
 
 def fetch_page(offset):
@@ -78,46 +68,6 @@ def fetch_page(offset):
     return data.get("features", []), data.get("exceededTransferLimit", False)
 
 
-def fetch_ottwatch():
-    """Return dict mapping app_number -> {description, url} from OttWatch."""
-    resp = requests.get(OTTWATCH_URL, timeout=30)
-    resp.raise_for_status()
-    features = resp.json().get("features", [])
-    lookup = {}
-    for f in features:
-        props = f.get("properties") or {}
-        app_number = (props.get("app_number") or "").strip()
-        if not app_number:
-            continue
-        description = (props.get("description") or "").strip() or None
-        lookup[app_number] = {"description": description}
-    return lookup
-
-
-def extract_storeys(text):
-    """Extract storey count from a description string."""
-    if not text:
-        return None
-    m = re.search(r'(\d+)[- ]?stor(?:e?y|eys)\b', text, re.IGNORECASE)
-    if not m:
-        m = re.search(r'(\d+)[- ]?sty\b', text, re.IGNORECASE)
-    if m:
-        val = int(m.group(1))
-        return val if 1 <= val <= 200 else None
-    return None
-
-
-def extract_units(text):
-    """Extract residential unit count from a description string."""
-    if not text:
-        return None
-    m = re.search(r'(\d+)\s+(?:\w+\s+){0,2}units?\b', text, re.IGNORECASE)
-    if m:
-        val = int(m.group(1))
-        return val if 1 <= val <= 10000 else None
-    return None
-
-
 def parse_epoch_ms(ms):
     if ms is None:
         return None
@@ -131,16 +81,6 @@ def run():
     pulled_at = datetime.now(timezone.utc)
     conn = psycopg2.connect(DATABASE_URL)
     cur = conn.cursor()
-
-    # Self-applying migrations for OttWatch enrichment columns
-    for col, col_type in [
-        ("description", "text"),
-        ("storeys", "smallint"),
-        ("unit_count", "int"),
-    ]:
-        cur.execute(
-            f"ALTER TABLE development_applications ADD COLUMN IF NOT EXISTS {col} {col_type}"
-        )
 
     cur.execute("TRUNCATE TABLE development_applications")
 
@@ -193,34 +133,6 @@ def run():
             break
 
     conn.commit()
-
-    # OttWatch enrichment
-    print("Fetching OttWatch data...")
-    try:
-        ottwatch = fetch_ottwatch()
-        print(f"  {len(ottwatch)} OttWatch entries loaded.")
-        rows = [
-            (app_number, data["description"],
-             extract_storeys(data["description"]),
-             extract_units(data["description"]))
-            for app_number, data in ottwatch.items()
-        ]
-        execute_values(cur, """
-            UPDATE development_applications SET
-                description  = v.description,
-                storeys      = v.storeys::smallint,
-                unit_count   = v.unit_count::int
-            FROM (VALUES %s) AS v(app_number, description, storeys, unit_count)
-            WHERE application_number = v.app_number
-        """, rows)
-        cur.execute("SELECT COUNT(*) FROM development_applications WHERE description IS NOT NULL")
-        enriched = cur.fetchone()[0]
-        conn.commit()
-        print(f"  {enriched} records enriched with OttWatch data.")
-    except Exception as e:
-        conn.rollback()
-        print(f"  OttWatch enrichment failed (non-fatal): {e}")
-
     cur.close()
     conn.close()
     print(f"Development applications: {total} saved, {skipped} skipped.")
