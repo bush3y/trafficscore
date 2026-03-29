@@ -429,8 +429,10 @@
       html += `<div style="margin-top:6px;font-weight:500;">Planning applications nearby:</div>`;
       for (const d of development) {
         const label = typeLabel(d.application_type);
-        const cityUrl = `https://devapps.ottawa.ca/en/applications/${d.application_number}/details`;
-        const addr = `<a href="${cityUrl}" target="_blank" rel="noopener" style="color:#9a3412;text-decoration:underline;">${d.address || d.application_number}</a>`;
+        const addrText = d.address || d.application_number;
+        const addr = d.in_devapps
+          ? `<a href="https://devapps.ottawa.ca/en/applications/${d.application_number}/details" target="_blank" rel="noopener" style="color:#9a3412;text-decoration:underline;">${addrText}</a>`
+          : addrText;
         const parts = [];
         if (d.storeys && d.unit_count) parts.push(`${d.storeys} storeys, ${d.unit_count} units`);
         else if (d.storeys)            parts.push(`${d.storeys} storeys`);

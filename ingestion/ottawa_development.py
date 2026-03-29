@@ -324,6 +324,7 @@ MIGRATIONS = [
     "ALTER TABLE development_applications ADD COLUMN IF NOT EXISTS can_comment BOOLEAN",
     "ALTER TABLE development_applications ADD COLUMN IF NOT EXISTS end_of_circulation_date DATE",
     "ALTER TABLE development_applications ADD COLUMN IF NOT EXISTS devapps_fetched_at TIMESTAMPTZ",
+    "ALTER TABLE development_applications ADD COLUMN IF NOT EXISTS devapps_status TEXT",
     # Documents table
     """
     CREATE TABLE IF NOT EXISTS development_application_documents (
@@ -453,6 +454,7 @@ def run():
             not_found += 1
         else:
             desc = (data.get("applicationBriefDesc") or {}).get("en") or None
+            devapps_status = (data.get("applicationStatus") or {}).get("en") or None
 
             # Planner info
             planner_first = (data.get("plannerFirstName") or "").strip()
@@ -488,6 +490,7 @@ def run():
                     ward_name              = %s,
                     can_comment            = %s,
                     end_of_circulation_date = %s,
+                    devapps_status         = %s,
                     devapps_fetched_at     = %s
                 WHERE application_number = %s
             """, [
@@ -503,6 +506,7 @@ def run():
                 ward_name,
                 can_comment,
                 end_of_circ,
+                devapps_status,
                 now,
                 app_number,
             ])
@@ -532,9 +536,36 @@ def run():
         conn.commit()
         time.sleep(DEVAPPS_SLEEP)
 
+    print(f"  {enriched} enriched, {not_found} not found in devapps.")
+
+    # --- Phase 3: backfill devapps_status for already-enriched records ---
+    cur.execute("""
+        SELECT DISTINCT application_number
+        FROM development_applications
+        WHERE devapps_fetched_at IS NOT NULL
+          AND application_number IS NOT NULL
+        ORDER BY application_number
+    """)
+    status_pending = [row[0] for row in cur.fetchall()]
+    print(f"Phase 3: Refreshing status for {len(status_pending)} enriched records...")
+
+    status_updated = 0
+    for app_number in status_pending:
+        data = fetch_devapp(app_number)
+        if data is not None:
+            devapps_status = (data.get("applicationStatus") or {}).get("en") or None
+            cur.execute("""
+                UPDATE development_applications
+                SET devapps_status = %s
+                WHERE application_number = %s
+            """, [devapps_status, app_number])
+            status_updated += 1
+        conn.commit()
+        time.sleep(DEVAPPS_SLEEP)
+
     cur.close()
     conn.close()
-    print(f"  {enriched} enriched, {not_found} not found in devapps.")
+    print(f"  {status_updated} statuses synced.")
     print("Done.")
 
 

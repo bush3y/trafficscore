@@ -616,11 +616,13 @@ def get_development_activity(
             building_type,
             parking_spaces,
             gross_floor_area_m2,
+            devapps_status IS NOT NULL AS in_devapps,
             ROUND(ST_Distance(geometry::geography, ST_MakePoint(%s, %s)::geography)::numeric) AS distance_m
         FROM development_applications
         WHERE ST_DWithin(geometry::geography, ST_MakePoint(%s, %s)::geography, %s)
           AND status IS NOT NULL
           AND application_type != 'Zoning By-law Amendment'
+          AND (devapps_status IS NULL OR devapps_status NOT IN ('Inactive', 'Post Approval'))
           AND status NOT ILIKE '%%in effect%%'
           AND status NOT IN (
             'Agreement Registered - Final Legal Clearance Given',
