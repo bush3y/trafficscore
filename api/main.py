@@ -517,7 +517,13 @@ def admin_status():
     construction_forecast = dict(cur.fetchone())
 
     cur.execute("""
-        SELECT COUNT(*) AS count, MAX(pulled_at)::text AS last_pulled
+        SELECT
+            COUNT(*)                                                        AS count,
+            MAX(pulled_at)::text                                            AS last_pulled,
+            COUNT(*) FILTER (WHERE description IS NOT NULL)                 AS enriched,
+            COUNT(*) FILTER (WHERE storeys IS NOT NULL)                     AS with_storeys,
+            COUNT(*) FILTER (WHERE unit_count IS NOT NULL)                  AS with_units,
+            (SELECT COUNT(*) FROM development_application_documents)        AS document_count
         FROM development_applications
     """)
     development_applications = dict(cur.fetchone())
@@ -604,6 +610,12 @@ def get_development_activity(
             status,
             status_date::text AS status_date,
             address,
+            storeys,
+            unit_count,
+            use_type,
+            building_type,
+            parking_spaces,
+            gross_floor_area_m2,
             ROUND(ST_Distance(geometry::geography, ST_MakePoint(%s, %s)::geography)::numeric) AS distance_m
         FROM development_applications
         WHERE ST_DWithin(geometry::geography, ST_MakePoint(%s, %s)::geography, %s)

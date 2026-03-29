@@ -127,11 +127,15 @@
           ], { label: "Ottawa Open Data — Construction Forecast", url: "https://open.ottawa.ca" }),
 
           card("Development Applications", [
-            ["Applications", num(d.development_applications.count)],
-            ["Coverage",     "Site plans, rezonings, condo plans, OPAs"],
-            ["Last pulled",  date(d.development_applications.last_pulled)],
-            ["Updates",      "Monthly refresh recommended"],
-            ["Script",       cmd("python -m ingestion.ottawa_development")],
+            ["Applications",  num(d.development_applications.count)],
+            ["Documents",     num(d.development_applications.document_count)],
+            ["Enriched",      num(d.development_applications.enriched) + " w/ description"],
+            ["With storeys",  num(d.development_applications.with_storeys)],
+            ["With units",    num(d.development_applications.with_units)],
+            ["Coverage",      "SPC, Condo, OPA, Subdivision, Demolition"],
+            ["Last pulled",   date(d.development_applications.last_pulled)],
+            ["Updates",       "Monthly refresh recommended"],
+            ["Script",        cmd("python -m ingestion.ottawa_development")],
           ], { label: "Ottawa Open Data — Development Applications", url: "https://open.ottawa.ca/maps/ottawa::development-applications-1/about" }),
 
           card("Neighbourhood Boundaries", [

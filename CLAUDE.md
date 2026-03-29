@@ -140,14 +140,21 @@ Two City of Ottawa datasets surface planning and construction activity near a st
 - Source: ArcGIS REST API, no auth required
 
 **Development Applications** (`development_applications` table)
-- Planning applications for significant residential development
-- Filtered types: Site Plan Control, Plan of Condominium, Official Plan Amendment, Plan of Subdivision
-- **Zoning By-law Amendments excluded**: too speculative (no approval, no construction timeline, may be small); downstream SPC will surface the actual development when filed
-- Many terminal statuses excluded from API (completed processes, lapsed, refused, by-law in effect); "Agreement Registered - Securities Held" and "Application Approved by OMB" are kept (construction/obligations still pending)
-- Full refresh monthly (paginated at 1,000/page, ~3,500 records)
-- Source: ArcGIS REST API, no auth required
-- Links to `devapps.ottawa.ca/en/applications/{app_number}/details` for full detail (description, documents, history)
+- Filtered types: Site Plan Control, Plan of Condominium, Official Plan Amendment, Plan of Subdivision, Demolition Control
+- **Zoning By-law Amendments excluded**: too speculative; downstream SPC will surface the actual development when filed
+- Many terminal statuses excluded from API; "Agreement Registered - Securities Held" and "Application Approved by OMB" kept
+- Source: ArcGIS REST API (no auth) — UPSERT on objectid, stale records deleted after each run
+- **devapps enrichment** (incremental): `GET https://devapps-restapi.ottawa.ca/devapps/{appNumber}?authKey=4r5T2egSmKm5`
+  - Structured: `description`, `planner_name`, `planner_email`, `ward_name`, `can_comment`, `end_of_circulation_date`
+  - Parsed from description: `storeys`, `unit_count`, `use_type`, `building_type`, `parking_spaces`, `gross_floor_area_m2`
+  - Only fetches records where `devapps_fetched_at IS NULL` — 404s also marked to avoid retries
 - **Committee of Adjustment** (minor variances) is a separate City system — not in this dataset
+
+**Development Application Documents** (`development_application_documents` table)
+- Populated during devapps enrichment — one row per document attachment
+- Fields: `doc_reference_id` (PK), `application_number`, `document_name`, `file_size_mb`, `file_path`, `doc_type`
+- `doc_type` inferred from document name keywords: `transportation_impact`, `shadow_study`, `noise_impact`, `urban_design`, `heritage_impact`, `environmental_impact`, `archaeological`, `planning_rationale`, `site_plan`, `landscape`, `geotechnical`, `servicing`, `environmental_assessment`, `survey`, `architectural_plans`, `tree_conservation`, `grading`, `draft_plan`, `demo_plan`, `correspondence`, `other`
+- Scale signals: `transportation_impact`, `shadow_study`, `noise_impact`, `urban_design` indicate larger projects
 
 **Construction Forecast** (`construction_forecast` table) also includes `traffic_impacts` field (fetched from ArcGIS `TRAFFICIMPACTS` column; "None/N/A" normalized to NULL in API).
 
@@ -168,7 +175,7 @@ python -m ingestion.ottawa_volumes --dir ./data/volumes  # Load intersection vol
 python -m ingestion.ottawa_neighbourhoods                # Download + load ONS neighbourhood boundaries
 python -m ingestion.octranspo_gtfs                       # Download + load OC Transpo bus routes (GTFS)
 python -m ingestion.construction_forecast                # Fetch City of Ottawa construction forecast (monthly)
-python -m ingestion.ottawa_development                   # Fetch Ottawa development applications (monthly)
+python -m ingestion.ottawa_development                   # Fetch Ottawa dev applications + devapps enrichment (monthly)
 python -m scoring.cutthrough                             # Compute cut-through risk scores
 python -m scoring.scorer                                 # Run full scoring pipeline
 # On server: docker compose build app && docker compose run --rm app python -m scoring.scorer
