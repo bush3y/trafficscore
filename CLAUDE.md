@@ -142,12 +142,13 @@ Two City of Ottawa datasets surface planning and construction activity near a st
 **Development Applications** (`development_applications` table)
 - Filtered types: Site Plan Control, Plan of Condominium, Official Plan Amendment, Plan of Subdivision, Demolition Control
 - **Zoning By-law Amendments excluded**: too speculative; downstream SPC will surface the actual development when filed
-- Many terminal statuses excluded from API; "Agreement Registered - Securities Held" and "Application Approved by OMB" kept
+- API only shows `devapps_status IN ('Active', 'File Pending')` — applications not found in devapps treated as inactive/archived
 - Source: ArcGIS REST API (no auth) — UPSERT on objectid, stale records deleted after each run
 - **devapps enrichment** (incremental): `GET https://devapps-restapi.ottawa.ca/devapps/{appNumber}?authKey=4r5T2egSmKm5`
-  - Structured: `description`, `planner_name`, `planner_email`, `ward_name`, `can_comment`, `end_of_circulation_date`
+  - Structured: `description`, `planner_name`, `planner_email`, `ward_name`, `can_comment`, `end_of_circulation_date`, `devapps_status`
   - Parsed from description: `storeys`, `unit_count`, `use_type`, `building_type`, `parking_spaces`, `gross_floor_area_m2`
-  - Only fetches records where `devapps_fetched_at IS NULL` — 404s also marked to avoid retries
+  - Phase 2: enriches new records (`devapps_fetched_at IS NULL`); Phase 3: refreshes `devapps_status` for all enriched records every run
+  - 404s in Phase 2 marked fetched to avoid retries; 404s in Phase 3 leave `devapps_status = NULL` (hidden from frontend)
 - **Committee of Adjustment** (minor variances) is a separate City system — not in this dataset
 
 **Development Application Documents** (`development_application_documents` table)
