@@ -567,10 +567,13 @@ def get_development_activity(
                 project_webpage,
                 traffic_impacts,
                 geometry,
-                COALESCE(
-                    NULLIF(project_webpage, ''),
-                    feature_type || '|' || status || '|' || targeted_start || '|' || COALESCE(traffic_impacts, '')
-                ) AS project_key
+                CASE
+                    WHEN project_webpage IS NOT NULL AND project_webpage != ''
+                        THEN project_webpage
+                    WHEN traffic_impacts IS NOT NULL AND traffic_impacts != ''
+                        THEN feature_type || '|' || status || '|' || targeted_start || '|' || traffic_impacts
+                    ELSE objectid::text
+                END AS project_key
             FROM construction_forecast
             WHERE ST_DWithin(geometry::geography, ST_MakePoint(%s, %s)::geography, %s)
               AND (
