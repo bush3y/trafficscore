@@ -568,7 +568,7 @@ def get_development_activity(
                 traffic_impacts,
                 geometry,
                 CASE
-                    WHEN project_webpage ILIKE 'http%'
+                    WHEN project_webpage ILIKE 'http%%'
                         THEN project_webpage
                     WHEN traffic_impacts IS NOT NULL AND traffic_impacts != ''
                         THEN feature_type || '|' || status || '|' || targeted_start || '|' || traffic_impacts
