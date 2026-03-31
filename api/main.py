@@ -622,7 +622,7 @@ def get_development_activity(
         WHERE ST_DWithin(geometry::geography, ST_MakePoint(%s, %s)::geography, %s)
           AND status IS NOT NULL
           AND application_type != 'Zoning By-law Amendment'
-          AND devapps_status IN ('Active', 'File Pending')
+          AND devapps_status IN ('Active', 'File Pending', 'Post Approval')
           AND status NOT ILIKE '%%in effect%%'
           AND status NOT IN (
             'Agreement Registered - Final Legal Clearance Given',

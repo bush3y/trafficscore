@@ -142,7 +142,7 @@ Two City of Ottawa datasets surface planning and construction activity near a st
 **Development Applications** (`development_applications` table)
 - Filtered types: Site Plan Control, Plan of Condominium, Official Plan Amendment, Plan of Subdivision, Demolition Control
 - **Zoning By-law Amendments excluded**: too speculative; downstream SPC will surface the actual development when filed
-- API only shows `devapps_status IN ('Active', 'File Pending')` — applications not found in devapps treated as inactive/archived
+- API only shows `devapps_status IN ('Active', 'File Pending', 'Post Approval')` — applications not found in devapps treated as inactive/archived; Post Approval kept because construction is still pending and ArcGIS deletion handles staleness when projects close out
 - Source: ArcGIS REST API (no auth) — UPSERT on objectid, stale records deleted after each run
 - **devapps enrichment** (incremental): `GET https://devapps-restapi.ottawa.ca/devapps/{appNumber}?authKey=4r5T2egSmKm5`
   - Structured: `description`, `planner_name`, `planner_email`, `ward_name`, `can_comment`, `end_of_circulation_date`, `devapps_status`
