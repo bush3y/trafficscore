@@ -416,17 +416,49 @@
       t === "Demolition Control"     ? "Demolition"  :
       t;
 
+    const constructionLabel = t => ({
+      'RRSW':     'Road, sewer & water',
+      'RD_RESF':  'Road resurfacing',
+      'RD_SURF':  'Road surface treatment',
+      'RD_SWRE':  'Sidewalk renewal',
+      'RD_CS':    'Road crack sealing',
+      'RD_MUPR':  'Multi-use pathway renewal',
+      'RD_RECO':  'Road reconstruction',
+      'RS':       'Sewer renewal',
+      'RSL':      'Sewer lining',
+      'RWM':      'Watermain renewal',
+      'SCR':      'Culvert renewal',
+      'SWM':      'Stormwater management',
+      'SBR':      'Bridge renewal',
+      'WBO':      'Work by others',
+      'MIM':      'Intersection modifications',
+      'GNR':      'New road',
+      'MS':       'New sidewalk',
+      'RSS':      'Streetscaping',
+      'CREN':     'Cycling renewal',
+      'RD_MUPR':  'Multi-use pathway renewal',
+      'GNT':      'New transit',
+    }[t] || t);
+
+    const constructionStatus = s => s === 'INPROGRESS' ? 'In progress' : s === 'PLANNED' ? 'Planned' : s;
+
     let html = `<div style="font-weight:600;margin-bottom:6px;">🚧 Nearby activity</div>`;
 
     if (construction.length) {
-      const thisYear = construction.filter(c => c.targeted_start === "This Year").length;
-      let txt = `City construction: ${construction.length} project${construction.length > 1 ? "s" : ""} within 500m`;
-      if (thisYear) txt += ` (${thisYear} this year)`;
-      html += `<div>${txt}</div>`;
+      html += `<div style="margin-top:4px;font-weight:500;">City construction nearby:</div>`;
+      for (const c of construction) {
+        const label = constructionLabel(c.feature_type);
+        const status = constructionStatus(c.status);
+        const timing = c.targeted_start || '';
+        const meta = [status, timing].filter(Boolean).join(' · ');
+        const impacts = c.traffic_impacts ? ` <span style="color:#b45309;">— ${c.traffic_impacts}</span>` : '';
+        const distStr = c.distance_m != null ? ` <span style="color:#bbb;">${c.distance_m}m</span>` : '';
+        html += `<div style="margin-top:3px;">${label} · <span style="color:#888;">${meta}</span>${impacts}${distStr}</div>`;
+      }
     }
 
     if (development.length) {
-      html += `<div style="margin-top:6px;font-weight:500;">Planning applications nearby:</div>`;
+      html += `<div style="margin-top:${construction.length ? 8 : 4}px;font-weight:500;">Planning applications nearby:</div>`;
       for (const d of development) {
         const label = typeLabel(d.application_type);
         const addrText = d.address || d.application_number;
