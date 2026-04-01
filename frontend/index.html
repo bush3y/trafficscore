@@ -532,6 +532,18 @@
         </div>
       `).join("")}
 
+      <div style="margin-top:8px;">
+        <button onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.textContent=this.textContent.includes('▾')?'What do these mean? ▸':'What do these mean? ▾';"
+          style="background:none;border:none;padding:0;font-size:0.78rem;color:#aaa;cursor:pointer;text-align:left;">What do these mean? ▾</button>
+        <div style="display:none;margin-top:6px;font-size:0.78rem;color:#666;line-height:1.6;">
+          <div style="margin-bottom:4px;color:#555;font-size:0.8rem;"><strong>Overall score</strong> — A weighted combination of volume, speed, safety, and cut-through.</div>
+          <div>· <strong>Volume</strong> — How busy the street is relative to others in Ottawa</div>
+          <div>· <strong>Speed</strong> — How fast traffic moves relative to other streets</div>
+          <div>· <strong>Safety</strong> — How frequently collisions occur relative to other streets</div>
+          <div>· <strong>Cut-through</strong> — How likely the street is used as a shortcut compared to other residential streets</div>
+        </div>
+      </div>
+
       <div id="relative-row"></div>
       <div id="nb-row"></div>
       <div id="bus-routes-row"></div>
@@ -799,6 +811,18 @@ function addressMessage(score) {
           <div class="score-value">${row.value != null ? Math.round(row.value) : "—"}</div>
         </div>
       `).join("")}
+
+      <div style="margin-top:8px;">
+        <button onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.textContent=this.textContent.includes('▾')?'What do these mean? ▸':'What do these mean? ▾';"
+          style="background:none;border:none;padding:0;font-size:0.78rem;color:#aaa;cursor:pointer;text-align:left;">What do these mean? ▾</button>
+        <div style="display:none;margin-top:6px;font-size:0.78rem;color:#666;line-height:1.6;">
+          <div style="margin-bottom:4px;color:#555;font-size:0.8rem;"><strong>Overall score</strong> — A weighted combination of volume, speed, safety, and cut-through.</div>
+          <div>· <strong>Volume</strong> — How busy the street is relative to others in Ottawa</div>
+          <div>· <strong>Speed</strong> — How fast traffic moves relative to other streets</div>
+          <div>· <strong>Safety</strong> — How frequently collisions occur relative to other streets</div>
+          <div>· <strong>Cut-through</strong> — How likely the street is used as a shortcut compared to other residential streets</div>
+        </div>
+      </div>
 
       <div id="relative-row"></div>
       ${renderNeighbourhoodRow(neighbourhoodScore, neighbourhood)}
