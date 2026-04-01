@@ -611,39 +611,42 @@ def get_development_activity(
     # "Application Approved by OMB" kept: bylaw enactment and construction still pending.
     # Null status excluded: unknown state.
     cur.execute("""
-        SELECT
-            application_number,
-            application_type,
-            status,
-            status_date::text AS status_date,
-            address,
-            storeys,
-            unit_count,
-            use_type,
-            building_type,
-            parking_spaces,
-            gross_floor_area_m2,
-            devapps_status IS NOT NULL AS in_devapps,
-            ROUND(ST_Distance(geometry::geography, ST_MakePoint(%s, %s)::geography)::numeric) AS distance_m
-        FROM development_applications
-        WHERE ST_DWithin(geometry::geography, ST_MakePoint(%s, %s)::geography, %s)
-          AND status IS NOT NULL
-          AND application_type != 'Zoning By-law Amendment'
-          AND devapps_status IN ('Active', 'File Pending', 'Post Approval')
-          AND status NOT ILIKE '%%in effect%%'
-          AND status NOT IN (
-            'Agreement Registered - Final Legal Clearance Given',
-            'No Appeal - Official Plan Amendment Adopted',
-            'OMB Appeal Withdrawn - Application Approved',
-            'Application Refused by OMB',
-            'By-law Refused',
-            'Approval Lapsed - No Building Permit Issued',
-            'Agreement lapsed',
-            'Application Approved - No Agreement/Letter of Undertaking Required',
-            'Application Approved: No Agreement/Letter of Undertaking Required',
-            'Approved - Agreement Signed, Registration Not Required',
-            'CWN approved'
-          )
+        SELECT * FROM (
+            SELECT DISTINCT ON (application_number)
+                application_number,
+                application_type,
+                status,
+                status_date::text AS status_date,
+                address,
+                storeys,
+                unit_count,
+                use_type,
+                building_type,
+                parking_spaces,
+                gross_floor_area_m2,
+                devapps_status IS NOT NULL AS in_devapps,
+                ROUND(ST_Distance(geometry::geography, ST_MakePoint(%s, %s)::geography)::numeric) AS distance_m
+            FROM development_applications
+            WHERE ST_DWithin(geometry::geography, ST_MakePoint(%s, %s)::geography, %s)
+              AND status IS NOT NULL
+              AND application_type != 'Zoning By-law Amendment'
+              AND devapps_status IN ('Active', 'File Pending', 'Post Approval')
+              AND status NOT ILIKE '%%in effect%%'
+              AND status NOT IN (
+                'Agreement Registered - Final Legal Clearance Given',
+                'No Appeal - Official Plan Amendment Adopted',
+                'OMB Appeal Withdrawn - Application Approved',
+                'Application Refused by OMB',
+                'By-law Refused',
+                'Approval Lapsed - No Building Permit Issued',
+                'Agreement lapsed',
+                'Application Approved - No Agreement/Letter of Undertaking Required',
+                'Application Approved: No Agreement/Letter of Undertaking Required',
+                'Approved - Agreement Signed, Registration Not Required',
+                'CWN approved'
+              )
+            ORDER BY application_number, distance_m
+        ) sub
         ORDER BY distance_m
         LIMIT 10
     """, [lng, lat, lng, lat, dev_radius_m])
