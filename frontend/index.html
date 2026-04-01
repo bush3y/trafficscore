@@ -411,7 +411,7 @@
     const bg = color + "22";
     const label = name ? `${name} neighbourhood score` : "Neighbourhood score";
     return `
-      <div style="margin-top:12px;padding:10px 12px;background:${bg};border-radius:8px;display:flex;justify-content:space-between;align-items:center;">
+      <div style="margin-top:8px;padding:10px 12px;background:${bg};border-radius:8px;display:flex;justify-content:space-between;align-items:center;">
         <span style="font-size:0.82rem;color:#444;">🏘 ${label}</span>
         <span style="font-size:1.1rem;font-weight:700;color:${color}">${Math.round(score)}</span>
       </div>`;
@@ -507,7 +507,7 @@
     }
 
     return `
-      <div style="margin-top:12px;padding:10px 12px;background:#fff7ed;border-left:3px solid #fb923c;border-radius:8px;font-size:0.82rem;color:#444;">
+      <div style="margin-top:8px;padding:10px 12px;background:#fff7ed;border-left:3px solid #fb923c;border-radius:8px;font-size:0.82rem;color:#444;">
         ${html}
       </div>`;
   }
