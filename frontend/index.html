@@ -694,7 +694,7 @@
     if (busRoutes?.length) activityParts.push("🚌 Bus route");
     if (devData?.construction?.length) activityParts.push("🚧 Construction nearby");
     if (devData?.development?.length) activityParts.push("🏗️ Development nearby");
-    const activityLine = activityParts.join(" · ");
+    const activityLine = activityParts.join("\n");
 
     // Group score + traffic descriptor together; separate name, neighbourhood, and URL with blank lines
     const scoreGroup = [line2, trafficLine].filter(Boolean).join("\n");
