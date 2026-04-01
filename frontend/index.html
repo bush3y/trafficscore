@@ -475,7 +475,7 @@
     let html = `<div style="font-weight:600;margin-bottom:6px;">🚧 Nearby activity</div>`;
 
     if (construction.length) {
-      html += `<div style="margin-top:4px;font-weight:500;">🚧 City construction nearby:</div>`;
+      html += `<div style="margin-top:4px;font-weight:500;">City construction nearby:</div>`;
       for (const c of construction) {
         const label = constructionLabel(c.feature_type);
         const status = constructionStatus(c.status);
