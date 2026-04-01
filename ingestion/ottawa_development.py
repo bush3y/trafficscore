@@ -439,6 +439,7 @@ def run():
 
     enriched = 0
     not_found = 0
+    phase2_fetched = set()
 
     for app_number in pending:
         data = fetch_devapp(app_number)
@@ -532,6 +533,7 @@ def run():
                 ])
 
             enriched += 1
+            phase2_fetched.add(app_number)
 
         conn.commit()
         time.sleep(DEVAPPS_SLEEP)
@@ -546,7 +548,7 @@ def run():
           AND application_number IS NOT NULL
         ORDER BY application_number
     """)
-    status_pending = [row[0] for row in cur.fetchall()]
+    status_pending = [row[0] for row in cur.fetchall() if row[0] not in phase2_fetched]
     print(f"Phase 3: Refreshing status for {len(status_pending)} enriched records...")
 
     status_updated = 0

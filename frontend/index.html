@@ -436,7 +436,6 @@
       'MS':       'New sidewalk',
       'RSS':      'Streetscaping',
       'CREN':     'Cycling renewal',
-      'RD_MUPR':  'Multi-use pathway renewal',
       'GNT':      'New transit',
     }[t] || t);
 
@@ -458,7 +457,8 @@
     }
 
     if (development.length) {
-      html += `<div style="margin-top:${construction.length ? 14 : 4}px;padding-top:${construction.length ? 10 : 0}px;${construction.length ? 'border-top:1px solid #fde8d0;' : ''}font-weight:500;">Planning applications nearby:</div>`;
+      const hasBoth = construction.length > 0;
+      html += `<div style="margin-top:${hasBoth ? 14 : 4}px;${hasBoth ? 'padding-top:10px;border-top:1px solid #fde8d0;' : ''}font-weight:500;">Planning applications nearby:</div>`;
       for (const d of development) {
         const label = typeLabel(d.application_type);
         const addrText = d.address || d.application_number;
