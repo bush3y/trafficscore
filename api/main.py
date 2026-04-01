@@ -579,9 +579,10 @@ def get_development_activity(
               AND (
                 feature_type IN (
                   'RRSW', 'RD_RESF', 'RD_SURF', 'RD_SWRE', 'RD_CS',
-                  'RS', 'RSL', 'RWM', 'SCR', 'SWM', 'SBR', 'WBO',
+                  'RS', 'RSL', 'RWM', 'SCR', 'SWM', 'SBR',
                   'MIM', 'GNR', 'MS', 'RSS', 'CREN', 'RD_MUPR'
                 )
+                OR (feature_type = 'WBO' AND traffic_impacts IS NOT NULL AND traffic_impacts !~* '^\s*(none|no[\s.]|no$|n/?a|na)\s*')
                 OR (feature_type = 'GNT' AND project_webpage IS NOT NULL AND project_webpage != '')
               )
         ),
