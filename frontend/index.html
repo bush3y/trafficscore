@@ -475,7 +475,7 @@
     let html = `<div style="font-weight:600;margin-bottom:6px;">🚧 Nearby activity</div>`;
 
     if (construction.length) {
-      html += `<div style="margin-top:4px;font-weight:500;">City construction nearby:</div>`;
+      html += `<div style="margin-top:4px;font-weight:500;">🚧 City construction nearby:</div>`;
       for (const c of construction) {
         const label = constructionLabel(c.feature_type);
         const status = constructionStatus(c.status);
@@ -489,7 +489,7 @@
 
     if (development.length) {
       const hasBoth = construction.length > 0;
-      html += `<div style="margin-top:${hasBoth ? 14 : 4}px;${hasBoth ? 'padding-top:10px;border-top:1px solid #fde8d0;' : ''}font-weight:500;">Planning applications nearby:</div>`;
+      html += `<div style="margin-top:${hasBoth ? 14 : 4}px;${hasBoth ? 'padding-top:10px;border-top:1px solid #fde8d0;' : ''}font-weight:500;">🏗️ Planning applications nearby:</div>`;
       for (const d of development) {
         const label = typeLabel(d.application_type);
         const addrText = d.address || d.application_number;
