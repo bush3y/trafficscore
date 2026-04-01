@@ -398,7 +398,7 @@
       ? `<div style="margin-top:6px;">Nearby: ${phrasing(rel.nb_percentile)} of ${classLabel} streets (${rel.nb_total} nearby streets)</div>`
       : "";
     return `
-      <div style="margin-top:12px;padding:10px 12px;background:#f5f5f5;border-radius:8px;font-size:0.8rem;color:#444;">
+      <div style="margin-top:16px;padding:10px 12px;background:#f5f5f5;border-radius:8px;font-size:0.8rem;color:#444;">
         <div style="font-weight:600;margin-bottom:8px;">Compared to similar streets</div>
         <div>Ottawa: ${phrasing(rel.city_percentile)} of ${classLabel} streets</div>
         ${nbLine}
@@ -428,7 +428,7 @@
       headway < 60  ? ` · ~every ${Math.round(headway)} min` :
                       ` · ~every ${Math.round(headway / 60)} hr`;
     return `
-      <div style="margin-top:12px;padding:10px 12px;background:#f5f5f5;border-radius:8px;font-size:0.82rem;color:#444;">
+      <div style="margin-top:16px;padding:10px 12px;background:#f5f5f5;border-radius:8px;font-size:0.82rem;color:#444;">
         <div style="font-weight:600;margin-bottom:4px;">🚌 Bus traffic</div>
         <div>Routes: ${names}${freqText}</div>
       </div>`;
@@ -507,7 +507,7 @@
     }
 
     return `
-      <div style="margin-top:12px;padding:10px 12px;background:#fff7ed;border-left:3px solid #fb923c;border-radius:8px;font-size:0.82rem;color:#444;">
+      <div style="margin-top:16px;padding:10px 12px;background:#fff7ed;border-left:3px solid #fb923c;border-radius:8px;font-size:0.82rem;color:#444;">
         ${html}
       </div>`;
   }
