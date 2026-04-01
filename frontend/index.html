@@ -598,7 +598,7 @@
         fetch(`/api/development-activity?lat=${lat}&lng=${lng}`).then(r => r.json()).catch(() => null),
       ])
     ).then(([nb, geo, rel, bus, dev]) => {
-      shareData = { ...shareData, relData: rel, nbScore: nb?.avg_score, nbName: geo?.neighbourhood };
+      shareData = { ...shareData, relData: rel, nbScore: nb?.avg_score, nbName: geo?.neighbourhood, busRoutes: bus?.routes, devData: dev };
       const relEl = document.getElementById("relative-row");
       if (relEl) relEl.innerHTML = renderRelativeRow(rel);
       const el = document.getElementById("nb-row");
@@ -654,7 +654,7 @@
 
   function buildShareText() {
     if (!shareData) return window.location.href;
-    const { name, address, score, volume, speed, safety, relData, nbScore, nbName } = shareData;
+    const { name, address, score, volume, speed, safety, relData, nbScore, nbName, busRoutes, devData } = shareData;
 
     const line1 = `📍 ${address || name || "Unknown street"}`;
     const shortLabel = score >= 65 ? "Busy" : score >= 35 ? "Moderate" : score >= 20 ? "Quiet" : "Very quiet";
@@ -690,9 +690,15 @@
 
     const urlLine = `https://trafficscore.myke.org${window.location.search}`;
 
+    const activityParts = [];
+    if (busRoutes?.length) activityParts.push("🚌 Bus route");
+    if (devData?.construction?.length) activityParts.push("🚧 Construction nearby");
+    if (devData?.development?.length) activityParts.push("🏗️ Development nearby");
+    const activityLine = activityParts.join(" · ");
+
     // Group score + traffic descriptor together; separate name, neighbourhood, and URL with blank lines
     const scoreGroup = [line2, trafficLine].filter(Boolean).join("\n");
-    return [line1, scoreGroup, nbLine, urlLine].filter(Boolean).join("\n\n");
+    return [line1, scoreGroup, nbLine, activityLine, urlLine].filter(Boolean).join("\n\n");
   }
 
   window.copyShareLink = function() {
@@ -939,7 +945,7 @@ function addressMessage(score) {
               fetch(`/api/bus-routes?lat=${lat}&lng=${lon}`).then(r => r.json()).catch(() => null),
               fetch(`/api/development-activity?lat=${lat}&lng=${lon}`).then(r => r.json()).catch(() => null),
             ]).then(([rel, bus, dev]) => {
-              shareData = { ...shareData, relData: rel };
+              shareData = { ...shareData, relData: rel, busRoutes: bus?.routes, devData: dev };
               const relEl = document.getElementById("relative-row");
               if (relEl && rel) relEl.innerHTML = renderRelativeRow(rel);
               const busEl = document.getElementById("bus-routes-row");
