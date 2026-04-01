@@ -585,6 +585,11 @@ def get_development_activity(
                 OR (feature_type IN ('WBO', 'SCR', 'RSS', 'MS', 'MIM') AND traffic_impacts IS NOT NULL AND traffic_impacts !~* '^\s*(none|no[\s.]|no$|n/?a|na)\s*')
                 OR (feature_type = 'GNT' AND project_webpage IS NOT NULL AND project_webpage != '')
               )
+              AND (
+                status = 'INPROGRESS'
+                OR targeted_start = 'This Year'
+                OR (traffic_impacts IS NOT NULL AND traffic_impacts !~* '^\s*(none|no[\s.]|no$|n/?a|na)\s*')
+              )
         ),
         deduped AS (
             SELECT DISTINCT ON (project_key)

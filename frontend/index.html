@@ -808,8 +808,7 @@ function addressMessage(score) {
     const content = document.getElementById("sidebar-content");
 
     content.innerHTML = `
-      <div style="font-size:0.8rem;color:#888;margin-bottom:4px;">📍 ${addressShortName}</div>
-      <h2>${p.name || "Unnamed street"}</h2>
+      <h2>📍 ${addressShortName}</h2>
       <div class="road-class">${p.road_class || ""} · ${p.speed_limit ? p.speed_limit + " km/h" : "speed limit unknown"}</div>
 
       <div class="composite-score" style="background:${bg}">
