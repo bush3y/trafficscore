@@ -31,9 +31,7 @@
     td:first-child { color: #666; font-size: 0.8rem; width: 38%; }
     td:not(:first-child) { text-align: center; width: 31%; }
 
-    .section-row td { background: #f9f9f9; font-size: 0.72rem; font-weight: 600; color: #aaa; text-transform: uppercase; letter-spacing: 0.05em; padding: 6px 10px; }
-
-    .score-cell { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.score-cell { display: flex; flex-direction: column; align-items: center; gap: 3px; }
     .score-big { font-weight: 700; font-size: 1.15rem; }
     .score-bar { height: 4px; border-radius: 2px; }
     .score-sub { font-weight: 600; font-size: 0.88rem; }
@@ -143,8 +141,8 @@
       : `<td></td>`;
   }
 
-  function sectionRow(label) {
-    return `<tr class="section-row"><td colspan="3">${label}</td></tr>`;
+  function dividerRow() {
+    return `<tr><td colspan="3" style="padding:0;border-bottom:2px solid #e8e8e8;"></td></tr>`;
   }
 
   function addrHeader(result) {
@@ -178,14 +176,13 @@
           </tr>
         </thead>
         <tbody>
-          ${sectionRow('Scores')}
           <tr><td>Overall</td>${scoreCell(pA?.composite_score, true)}${scoreCell(pB?.composite_score, true)}</tr>
           <tr><td>Volume</td>${scoreCell(pA?.volume_score)}${scoreCell(pB?.volume_score)}</tr>
           <tr><td>Speed</td>${scoreCell(pA?.speed_score)}${scoreCell(pB?.speed_score)}</tr>
           <tr><td>Safety</td>${scoreCell(pA?.safety_score)}${scoreCell(pB?.safety_score)}</tr>
           <tr><td>Cut-through</td>${scoreCell(pA?.cutthrough_score)}${scoreCell(pB?.cutthrough_score)}</tr>
           <tr><td>Neighbourhood</td>${scoreCell(a?.nb?.avg_score)}${scoreCell(b?.nb?.avg_score)}</tr>
-          ${sectionRow('Nearby')}
+          ${dividerRow()}
           <tr><td>🚌 Bus route</td>${yesCell(a?.bus?.routes?.length)}${yesCell(b?.bus?.routes?.length)}</tr>
           <tr><td>🚧 Construction</td>${yesCell(a?.dev?.construction?.length)}${yesCell(b?.dev?.construction?.length)}</tr>
           <tr><td>🏗️ Development</td>${yesCell(a?.dev?.development?.length)}${yesCell(b?.dev?.development?.length)}</tr>
