@@ -93,24 +93,45 @@ def build_graph(conn) -> nx.Graph:
         G.nodes[v]["road_classes"].add(road_class)
 
         G.add_edge(u, v, seg_id=seg_id, road_class=road_class, road_name=name, length_m=length_m or 0)
-        segment_lookup[seg_id] = (u, v, road_class, length_m or 0)
+        segment_lookup[seg_id] = (u, v, road_class, length_m or 0, name)
 
     print(f"Graph: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges")
     return G, segment_lookup
 
 
-def node_arterial_names(node, G) -> set:
-    """Return set of arterial road names connecting to this node."""
+def node_arterial_names(node, G, road_name: str = None) -> set:
+    """Return set of arterial road names connecting to this node.
+
+    If the node has no direct arterial connections but only connects to
+    segments of the same road name (i.e. it's an interior junction within
+    a multi-segment crescent), follow those same-name segments to their far
+    ends and check those for arterials instead.
+    """
     names = set()
-    for _, _, data in G.edges(node, data=True):
+    for _, neighbour, data in G.edges(node, data=True):
         if data.get("road_class") in ARTERIAL_CLASSES:
-            road_name = data.get("road_name")
-            if road_name is not None:
-                names.add(road_name)
+            road_name_edge = data.get("road_name")
+            if road_name_edge is not None:
+                names.add(road_name_edge)
+    if names:
+        return names
+
+    # No direct arterial — check if this is an interior junction on the same
+    # named road (all neighbours share the same road name as the segment being scored).
+    if road_name is None:
+        return names
+    for _, neighbour, data in G.edges(node, data=True):
+        if data.get("road_name") == road_name:
+            # Follow to the far end of this same-name segment
+            for _, _, far_data in G.edges(neighbour, data=True):
+                if far_data.get("road_class") in ARTERIAL_CLASSES:
+                    far_name = far_data.get("road_name")
+                    if far_name is not None:
+                        names.add(far_name)
     return names
 
 
-def score_segment(seg_id: int, u, v, road_class: str, length_m: float, G: nx.Graph) -> float:
+def score_segment(seg_id: int, u, v, road_class: str, length_m: float, G: nx.Graph, seg_name: str = None) -> float:
     """Compute cut-through risk score for a single segment."""
     if road_class not in CUTTHROUGH_CANDIDATE_CLASSES:
         return 0.0
@@ -124,8 +145,8 @@ def score_segment(seg_id: int, u, v, road_class: str, length_m: float, G: nx.Gra
         return 0.1
 
     # Which arterials does each end connect to?
-    u_arterials = node_arterial_names(u, G)
-    v_arterials = node_arterial_names(v, G)
+    u_arterials = node_arterial_names(u, G, seg_name)
+    v_arterials = node_arterial_names(v, G, seg_name)
 
     if u_arterials and v_arterials:
         # Both ends touch the same arterial — crescent/loop, not a shortcut
@@ -148,12 +169,12 @@ def compute_and_save(conn):
 
     print("Scoring cut-through risk for each segment...")
     scores = []
-    for seg_id, (u, v, road_class, length_m) in segment_lookup.items():
+    for seg_id, (u, v, road_class, length_m, seg_name) in segment_lookup.items():
         if road_class not in CUTTHROUGH_CANDIDATE_CLASSES:
             # Arterials are attractors, not candidates — leave cutthrough_risk NULL
             # so the composite formula excludes this component for them entirely
             continue
-        score = score_segment(seg_id, u, v, road_class, length_m, G)
+        score = score_segment(seg_id, u, v, road_class, length_m, G, seg_name)
         scores.append((score, seg_id))
 
     cur = conn.cursor()
