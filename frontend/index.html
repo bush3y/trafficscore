@@ -652,8 +652,82 @@
       compareSlot = { name };
       updateCompareChip();
     } else {
-      window.location.href = `/compare?a=${encodeURIComponent(compareSlot.name)}&b=${encodeURIComponent(name)}`;
+      const nameA = compareSlot.name;
+      compareSlot = null;
+      updateCompareChip();
+      renderCompareCard(nameA, name);
     }
+  }
+
+  async function fetchAddressData(q) {
+    const geo = await fetch(`/api/geocode?q=${encodeURIComponent(q)}`).then(r => r.json()).catch(() => []);
+    if (!geo.length) return null;
+    const { lat, lon } = geo[0];
+    const [nearby, nb, bus, dev] = await Promise.all([
+      fetch(`/api/segments/nearby?lat=${lat}&lng=${lon}&limit=5`).then(r => r.json()).catch(() => ({ features: [] })),
+      fetch(`/api/neighbourhood?lat=${lat}&lng=${lon}`).then(r => r.json()).catch(() => null),
+      fetch(`/api/bus-routes?lat=${lat}&lng=${lon}`).then(r => r.json()).catch(() => null),
+      fetch(`/api/development-activity?lat=${lat}&lng=${lon}`).then(r => r.json()).catch(() => null),
+    ]);
+    return { q, seg: nearby.features?.[0] ?? null, nb, bus, dev };
+  }
+
+  function renderCompareCard(nameA, nameB) {
+    const content = document.getElementById('sidebar-content');
+    content.innerHTML = `<div style="color:#aaa;font-size:0.85rem;padding:12px 0;">Comparing…</div>`;
+    openSidebar();
+
+    Promise.all([fetchAddressData(nameA), fetchAddressData(nameB)]).then(([a, b]) => {
+      const pA = a?.seg?.properties;
+      const pB = b?.seg?.properties;
+
+      function cmpScoreCell(val, big = false) {
+        if (val == null) return `<td style="text-align:center;color:#ccc;">—</td>`;
+        const color = scoreColor(val);
+        const num = Math.round(val);
+        if (big) return `<td style="text-align:center;"><span style="font-size:1.1rem;font-weight:700;color:${color};">${num}</span><br><span style="font-size:0.7rem;color:#888;">${scoreLabel(num)}</span></td>`;
+        return `<td style="text-align:center;font-weight:600;font-size:0.88rem;color:${color};">${num}</td>`;
+      }
+
+      function cmpYesCell(present) {
+        return present
+          ? `<td style="text-align:center;color:#ef4444;font-weight:600;font-size:0.82rem;">yes</td>`
+          : `<td></td>`;
+      }
+
+      const shortA = nameA.length > 18 ? nameA.slice(0, 16) + '…' : nameA;
+      const shortB = nameB.length > 18 ? nameB.slice(0, 16) + '…' : nameB;
+
+      const tdLabel = `style="font-size:0.78rem;color:#666;padding:7px 0 7px 0;width:40%;"`;
+      const thStyle = `style="text-align:center;font-size:0.75rem;font-weight:600;color:#444;padding-bottom:8px;width:30%;"`;
+
+      const shareUrl = `https://trafficscore.myke.org/compare?a=${encodeURIComponent(nameA)}&b=${encodeURIComponent(nameB)}`;
+
+      content.innerHTML = `
+        <h2 style="font-size:0.95rem;">Comparing streets</h2>
+        <table style="width:100%;border-collapse:collapse;margin-top:14px;">
+          <thead>
+            <tr>
+              <th style="width:40%;"></th>
+              <th ${thStyle}>${shortA}</th>
+              <th ${thStyle}>${shortB}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom:1px solid #f0f0f0;"><td ${tdLabel}>Overall</td>${cmpScoreCell(pA?.composite_score, true)}${cmpScoreCell(pB?.composite_score, true)}</tr>
+            <tr style="border-bottom:1px solid #f0f0f0;"><td ${tdLabel}>Volume</td>${cmpScoreCell(pA?.volume_score)}${cmpScoreCell(pB?.volume_score)}</tr>
+            <tr style="border-bottom:1px solid #f0f0f0;"><td ${tdLabel}>Speed</td>${cmpScoreCell(pA?.speed_score)}${cmpScoreCell(pB?.speed_score)}</tr>
+            <tr style="border-bottom:1px solid #f0f0f0;"><td ${tdLabel}>Safety</td>${cmpScoreCell(pA?.safety_score)}${cmpScoreCell(pB?.safety_score)}</tr>
+            <tr style="border-bottom:1px solid #f0f0f0;"><td ${tdLabel}>Cut-through</td>${cmpScoreCell(pA?.cutthrough_score)}${cmpScoreCell(pB?.cutthrough_score)}</tr>
+            <tr style="border-bottom:1px solid #f0f0f0;"><td ${tdLabel}>Neighbourhood</td>${cmpScoreCell(a?.nb?.avg_score)}${cmpScoreCell(b?.nb?.avg_score)}</tr>
+            <tr style="background:#f9f9f9;border-bottom:1px solid #f0f0f0;"><td ${tdLabel}>🚌 Bus route</td>${cmpYesCell(a?.bus?.routes?.length)}${cmpYesCell(b?.bus?.routes?.length)}</tr>
+            <tr style="background:#f9f9f9;border-bottom:1px solid #f0f0f0;"><td ${tdLabel}>🚧 Construction</td>${cmpYesCell(a?.dev?.construction?.length)}${cmpYesCell(b?.dev?.construction?.length)}</tr>
+            <tr style="background:#f9f9f9;"><td ${tdLabel}>🏗️ Development</td>${cmpYesCell(a?.dev?.development?.length)}${cmpYesCell(b?.dev?.development?.length)}</tr>
+          </tbody>
+        </table>
+        <button onclick="(navigator.share ? navigator.share({title:'TrafficScore — Compare Streets',url:'${shareUrl}'}) : navigator.clipboard.writeText('${shareUrl}').then(() => { this.textContent='✓ Copied!'; setTimeout(()=>this.textContent='🔗 Share comparison',2000); }))" style="margin-top:14px;width:100%;padding:8px;background:#f5f5f5;border:1px solid #e0e0e0;border-radius:6px;font-size:0.82rem;color:#555;cursor:pointer;">🔗 Share comparison</button>
+      `;
+    });
   }
 
   function updateCompareChip() {
