@@ -832,5 +832,10 @@ def admin_page():
     return FileResponse("frontend/admin.html")
 
 
+@app.get("/compare")
+def compare_page():
+    return FileResponse("frontend/compare.html")
+
+
 # Serve frontend
 app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")

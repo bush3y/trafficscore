@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TrafficScore — Compare Streets</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f5f5; color: #222; min-height: 100vh; }
+
+    header { background: white; padding: 14px 16px; border-bottom: 1px solid #eee; }
+    .back { color: #3b82f6; text-decoration: none; font-size: 0.82rem; display: block; margin-bottom: 4px; }
+    h1 { font-size: 1rem; font-weight: 700; }
+
+    .search-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px 16px; background: white; border-bottom: 1px solid #eee; }
+    .search-box { display: flex; gap: 6px; }
+    .search-box input { flex: 1; min-width: 0; padding: 6px 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 0.85rem; }
+    .search-box button { padding: 6px 10px; background: #3b82f6; color: white; border: none; border-radius: 6px; font-size: 0.78rem; cursor: pointer; white-space: nowrap; }
+    .search-box button:hover { background: #2563eb; }
+
+    .compare-table-wrap { padding: 16px; }
+
+    table { width: 100%; border-collapse: collapse; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+
+    thead tr { background: #f9f9f9; border-bottom: 1px solid #eee; }
+    th { padding: 10px 10px; font-size: 0.75rem; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 0.04em; text-align: center; }
+    th:first-child { text-align: left; }
+
+    td { padding: 9px 10px; font-size: 0.85rem; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    td:first-child { color: #666; font-size: 0.8rem; width: 38%; }
+    td:not(:first-child) { text-align: center; width: 31%; }
+
+    .section-row td { background: #f9f9f9; font-size: 0.72rem; font-weight: 600; color: #aaa; text-transform: uppercase; letter-spacing: 0.05em; padding: 6px 10px; }
+
+    .score-cell { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+    .score-big { font-weight: 700; font-size: 1.15rem; }
+    .score-bar { height: 4px; border-radius: 2px; }
+    .score-sub { font-weight: 600; font-size: 0.88rem; }
+
+    .yes-flag { color: #ef4444; font-weight: 600; font-size: 0.82rem; }
+
+    .addr-name { font-weight: 600; font-size: 0.82rem; color: #222; line-height: 1.3; }
+    .addr-sub { font-size: 0.72rem; color: #888; margin-top: 2px; }
+
+    .info-msg { color: #aaa; font-size: 0.85rem; text-align: center; padding: 40px 16px; }
+    .error-msg { color: #ef4444; font-size: 0.85rem; text-align: center; padding: 20px 16px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <a href="/" class="back">← Back to map</a>
+  <h1>Compare Streets</h1>
+</header>
+
+<div class="search-row">
+  <div class="search-box">
+    <input id="input-a" type="text" placeholder="Address or street…" autocomplete="off" />
+    <button onclick="reloadWith('a', document.getElementById('input-a').value)">Go</button>
+  </div>
+  <div class="search-box">
+    <input id="input-b" type="text" placeholder="Address or street…" autocomplete="off" />
+    <button onclick="reloadWith('b', document.getElementById('input-b').value)">Go</button>
+  </div>
+</div>
+
+<div class="compare-table-wrap">
+  <div id="output" class="info-msg">Loading…</div>
+</div>
+
+<script>
+  function scoreColor(score) {
+    if (score == null) return "#aaa";
+    if (score < 20) return "#22c55e";
+    if (score < 35) return "#facc15";
+    if (score < 65) return "#fb923c";
+    return "#dc2626";
+  }
+
+  function scoreLabel(score) {
+    if (score == null) return "";
+    if (score < 20) return "Very quiet";
+    if (score < 35) return "Quiet";
+    if (score < 65) return "Moderate";
+    return "Busy";
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const qA = params.get('a') || '';
+  const qB = params.get('b') || '';
+
+  document.getElementById('input-a').value = qA;
+  document.getElementById('input-b').value = qB;
+
+  function reloadWith(slot, val) {
+    if (!val.trim()) return;
+    const p = new URLSearchParams(window.location.search);
+    p.set(slot, val.trim());
+    window.location.search = p.toString();
+  }
+
+  ['a', 'b'].forEach(slot => {
+    document.getElementById(`input-${slot}`).addEventListener('keydown', e => {
+      if (e.key === 'Enter') reloadWith(slot, e.target.value);
+    });
+  });
+
+  async function fetchAddress(q) {
+    if (!q) return null;
+    const geo = await fetch(`/api/geocode?q=${encodeURIComponent(q)}`).then(r => r.json()).catch(() => []);
+    if (!geo.length) return null;
+    const { lat, lon } = geo[0];
+    const [nearby, nb, bus, dev] = await Promise.all([
+      fetch(`/api/segments/nearby?lat=${lat}&lng=${lon}&limit=5`).then(r => r.json()).catch(() => ({ features: [] })),
+      fetch(`/api/neighbourhood?lat=${lat}&lng=${lon}`).then(r => r.json()).catch(() => null),
+      fetch(`/api/bus-routes?lat=${lat}&lng=${lon}`).then(r => r.json()).catch(() => null),
+      fetch(`/api/development-activity?lat=${lat}&lng=${lon}`).then(r => r.json()).catch(() => null),
+    ]);
+    const seg = nearby.features?.[0] ?? null;
+    return { q, seg, nb, bus, dev };
+  }
+
+  function scoreCell(val, big = false) {
+    if (val == null) return `<td><span style="color:#ddd;">—</span></td>`;
+    const color = scoreColor(val);
+    const num = Math.round(val);
+    if (big) {
+      return `<td>
+        <div class="score-cell">
+          <span class="score-big" style="color:${color}">${num}</span>
+          <div class="score-bar" style="background:${color};width:${Math.min(num, 100)}%;min-width:4px;opacity:0.35;"></div>
+          <span style="font-size:0.7rem;color:#888;">${scoreLabel(val)}</span>
+        </div>
+      </td>`;
+    }
+    return `<td><span class="score-sub" style="color:${color}">${num}</span></td>`;
+  }
+
+  function yesCell(present) {
+    return present
+      ? `<td><span class="yes-flag">yes</span></td>`
+      : `<td></td>`;
+  }
+
+  function sectionRow(label) {
+    return `<tr class="section-row"><td colspan="3">${label}</td></tr>`;
+  }
+
+  function addrHeader(result) {
+    if (!result?.seg) {
+      return `<th><span style="color:#aaa;font-size:0.75rem;">Not found</span></th>`;
+    }
+    const p = result.seg.properties;
+    const sub = [p.name, p.road_class, p.speed_limit ? p.speed_limit + ' km/h' : null].filter(Boolean).join(' · ');
+    return `<th style="text-align:center;">
+      <div class="addr-name">${result.q}</div>
+      <div class="addr-sub">${sub}</div>
+    </th>`;
+  }
+
+  function render(a, b) {
+    if (!a?.seg && !b?.seg) {
+      document.getElementById('output').innerHTML = '<div class="error-msg">Could not find either address — try a more specific search.</div>';
+      return;
+    }
+
+    const pA = a?.seg?.properties;
+    const pB = b?.seg?.properties;
+
+    document.getElementById('output').innerHTML = `
+      <table>
+        <thead>
+          <tr>
+            <th></th>
+            ${addrHeader(a)}
+            ${addrHeader(b)}
+          </tr>
+        </thead>
+        <tbody>
+          ${sectionRow('Scores')}
+          <tr><td>Overall</td>${scoreCell(pA?.composite_score, true)}${scoreCell(pB?.composite_score, true)}</tr>
+          <tr><td>Volume</td>${scoreCell(pA?.volume_score)}${scoreCell(pB?.volume_score)}</tr>
+          <tr><td>Speed</td>${scoreCell(pA?.speed_score)}${scoreCell(pB?.speed_score)}</tr>
+          <tr><td>Safety</td>${scoreCell(pA?.safety_score)}${scoreCell(pB?.safety_score)}</tr>
+          <tr><td>Cut-through</td>${scoreCell(pA?.cutthrough_score)}${scoreCell(pB?.cutthrough_score)}</tr>
+          <tr><td>Neighbourhood</td>${scoreCell(a?.nb?.avg_score)}${scoreCell(b?.nb?.avg_score)}</tr>
+          ${sectionRow('Nearby')}
+          <tr><td>🚌 Bus route</td>${yesCell(a?.bus?.routes?.length)}${yesCell(b?.bus?.routes?.length)}</tr>
+          <tr><td>🚧 Construction</td>${yesCell(a?.dev?.construction?.length)}${yesCell(b?.dev?.construction?.length)}</tr>
+          <tr><td>🏗️ Development</td>${yesCell(a?.dev?.development?.length)}${yesCell(b?.dev?.development?.length)}</tr>
+        </tbody>
+      </table>`;
+  }
+
+  if (qA || qB) {
+    Promise.all([fetchAddress(qA), fetchAddress(qB)]).then(([a, b]) => render(a, b));
+  } else {
+    document.getElementById('output').innerHTML = '<div class="info-msg">Enter two addresses above to compare.</div>';
+  }
+</script>
+</body>
+</html>
