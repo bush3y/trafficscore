@@ -320,7 +320,7 @@
     if (score < 20)  return "Very quiet";
     if (score < 35)  return "Quiet";
     if (score < 65)  return "Moderate";
-    return "Busy / concerning";
+    return "Busy";
   }
 
   function segmentColor(props) {
@@ -695,11 +695,8 @@
           : `<td></td>`;
       }
 
-      const shortA = nameA.length > 18 ? nameA.slice(0, 16) + '…' : nameA;
-      const shortB = nameB.length > 18 ? nameB.slice(0, 16) + '…' : nameB;
-
       const tdLabel = `style="font-size:0.78rem;color:#666;padding:7px 0 7px 0;width:40%;"`;
-      const thStyle = `style="text-align:center;font-size:0.75rem;font-weight:600;color:#444;padding-bottom:8px;width:30%;"`;
+      const thStyle = `style="text-align:center;font-size:0.75rem;font-weight:600;color:#444;padding-bottom:8px;width:30%;word-break:break-word;"`;
 
       const shareUrl = `https://trafficscore.myke.org/?type=compare&q=${encodeURIComponent(nameA)}&compare=${encodeURIComponent(nameB)}`;
       history.pushState(null, "", `?type=compare&q=${encodeURIComponent(nameA)}&compare=${encodeURIComponent(nameB)}`);
@@ -710,8 +707,8 @@
           <thead>
             <tr>
               <th style="width:40%;"></th>
-              <th ${thStyle}>${shortA}</th>
-              <th ${thStyle}>${shortB}</th>
+              <th ${thStyle}>${nameA}</th>
+              <th ${thStyle}>${nameB}</th>
             </tr>
           </thead>
           <tbody>
