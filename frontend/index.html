@@ -704,8 +704,8 @@
 
       function countCell(items, singular, plural) {
         if (!items?.length) return `<td></td>`;
-        const label = items.length === 1 ? `1 ${singular}` : `${items.length} ${plural}`;
-        return `<td style="text-align:center;color:#ef4444;font-weight:600;font-size:0.78rem;">${label}</td>`;
+        const word = items.length === 1 ? singular : plural;
+        return `<td style="text-align:center;"><span style="color:#ef4444;font-weight:700;font-size:0.95rem;">${items.length}</span><br><span style="font-size:0.7rem;color:#888;">${word}</span></td>`;
       }
 
       function nbCell(data) {
