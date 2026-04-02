@@ -36,6 +36,7 @@
     .score-bar { height: 4px; border-radius: 2px; }
     .score-sub { font-weight: 600; font-size: 0.88rem; }
 
+    .nearby-row td { background: #f9f9f9; }
     .yes-flag { color: #ef4444; font-weight: 600; font-size: 0.82rem; }
 
     .addr-name { font-weight: 600; font-size: 0.82rem; color: #222; line-height: 1.3; }
@@ -141,9 +142,6 @@
       : `<td></td>`;
   }
 
-  function dividerRow() {
-    return `<tr><td colspan="3" style="padding:0;border-bottom:2px solid #e8e8e8;"></td></tr>`;
-  }
 
   function addrHeader(result) {
     if (!result?.seg) {
@@ -182,10 +180,9 @@
           <tr><td>Safety</td>${scoreCell(pA?.safety_score)}${scoreCell(pB?.safety_score)}</tr>
           <tr><td>Cut-through</td>${scoreCell(pA?.cutthrough_score)}${scoreCell(pB?.cutthrough_score)}</tr>
           <tr><td>Neighbourhood</td>${scoreCell(a?.nb?.avg_score)}${scoreCell(b?.nb?.avg_score)}</tr>
-          ${dividerRow()}
-          <tr><td>🚌 Bus route</td>${yesCell(a?.bus?.routes?.length)}${yesCell(b?.bus?.routes?.length)}</tr>
-          <tr><td>🚧 Construction</td>${yesCell(a?.dev?.construction?.length)}${yesCell(b?.dev?.construction?.length)}</tr>
-          <tr><td>🏗️ Development</td>${yesCell(a?.dev?.development?.length)}${yesCell(b?.dev?.development?.length)}</tr>
+          <tr class="nearby-row"><td>🚌 Bus route</td>${yesCell(a?.bus?.routes?.length)}${yesCell(b?.bus?.routes?.length)}</tr>
+          <tr class="nearby-row"><td>🚧 Construction</td>${yesCell(a?.dev?.construction?.length)}${yesCell(b?.dev?.construction?.length)}</tr>
+          <tr class="nearby-row"><td>🏗️ Development</td>${yesCell(a?.dev?.development?.length)}${yesCell(b?.dev?.development?.length)}</tr>
         </tbody>
       </table>`;
   }
