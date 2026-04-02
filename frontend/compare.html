@@ -183,8 +183,21 @@
           <tr class="nearby-row"><td>🚧 Construction</td>${yesCell(a?.dev?.construction?.length)}${yesCell(b?.dev?.construction?.length)}</tr>
           <tr class="nearby-row"><td>🏗️ Development</td>${yesCell(a?.dev?.development?.length)}${yesCell(b?.dev?.development?.length)}</tr>
         </tbody>
-      </table>`;
+      </table>
+      <button id="share-btn" onclick="shareCompare()" style="margin-top:12px;width:100%;padding:8px;background:#f5f5f5;border:1px solid #e0e0e0;border-radius:6px;font-size:0.82rem;color:#555;cursor:pointer;">🔗 Share comparison</button>`;
   }
+
+  window.shareCompare = function() {
+    const url = window.location.href;
+    const btn = document.getElementById('share-btn');
+    if (navigator.share) {
+      navigator.share({ title: 'TrafficScore Ottawa — Compare Streets', url }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(url).then(() => {
+        if (btn) { btn.textContent = '✓ Copied!'; setTimeout(() => btn.textContent = '🔗 Share comparison', 2000); }
+      });
+    }
+  };
 
   if (qA || qB) {
     Promise.all([fetchAddress(qA), fetchAddress(qB)]).then(([a, b]) => render(a, b));
