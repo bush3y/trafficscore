@@ -701,7 +701,8 @@
       const tdLabel = `style="font-size:0.78rem;color:#666;padding:7px 0 7px 0;width:40%;"`;
       const thStyle = `style="text-align:center;font-size:0.75rem;font-weight:600;color:#444;padding-bottom:8px;width:30%;"`;
 
-      const shareUrl = `https://trafficscore.myke.org/compare?a=${encodeURIComponent(nameA)}&b=${encodeURIComponent(nameB)}`;
+      const shareUrl = `https://trafficscore.myke.org/?type=compare&q=${encodeURIComponent(nameA)}&compare=${encodeURIComponent(nameB)}`;
+      history.pushState(null, "", `?type=compare&q=${encodeURIComponent(nameA)}&compare=${encodeURIComponent(nameB)}`);
 
       content.innerHTML = `
         <h2 style="font-size:0.95rem;">Comparing streets</h2>
@@ -1183,6 +1184,10 @@ function addressMessage(score) {
     const q = params.get("q");
     const type = params.get("type");
     if (!q) return;
+    if (type === "compare") {
+      const compareB = params.get("compare");
+      if (compareB) { renderCompareCard(q, compareB); return; }
+    }
     document.getElementById("search-input").value = q;
     if (type === "address" || looksLikeAddress(q)) {
       doAddressSearch(q);
