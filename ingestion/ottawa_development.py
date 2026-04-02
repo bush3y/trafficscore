@@ -127,14 +127,28 @@ def fetch_devapp(app_number):
 # Parsers
 # ---------------------------------------------------------------------------
 
+_WORD_NUMBERS = {
+    'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5,
+    'six': 6, 'seven': 7, 'eight': 8, 'nine': 9, 'ten': 10,
+    'eleven': 11, 'twelve': 12, 'thirteen': 13, 'fourteen': 14, 'fifteen': 15,
+    'sixteen': 16, 'seventeen': 17, 'eighteen': 18, 'nineteen': 19, 'twenty': 20,
+}
+
 def extract_storeys(text):
     if not text:
         return None
+    # Digit form: "4 storey", "12-storey"
     m = re.search(r'(\d+)[- ]?stor(?:e?y|eys)\b', text, re.IGNORECASE)
     if not m:
         m = re.search(r'(\d+)[- ]?sty\b', text, re.IGNORECASE)
     if m:
         val = int(m.group(1))
+        return val if 1 <= val <= 200 else None
+    # Word form: "four storey", "twelve-storey" — take the highest if multiple
+    words = '|'.join(_WORD_NUMBERS)
+    matches = re.findall(rf'\b({words})[- ]?stor(?:e?y|eys)\b', text, re.IGNORECASE)
+    if matches:
+        val = max(_WORD_NUMBERS[w.lower()] for w in matches)
         return val if 1 <= val <= 200 else None
     return None
 
@@ -156,10 +170,14 @@ def extract_use_type(text):
     if not text:
         return None
     t = text.lower()
+    # Check industrial first — "storage units" / "warehouse" should not bleed into residential
+    industrial = any(x in t for x in ['industrial', 'warehouse', 'manufacturing', 'storage'])
+    if industrial:
+        return 'industrial'
     residential = any(x in t for x in [
-        'residential', 'dwelling', 'apartment', 'townhouse', 'housing', 'units',
+        'residential', 'dwelling', 'apartment', 'townhouse', 'housing',
         'retirement', 'long-term care', 'affordable housing',
-    ])
+    ]) or bool(re.search(r'\bdwelling units?\b|\bresidential units?\b', t))
     commercial = any(x in t for x in [
         'commercial', 'retail', 'office', 'hotel', 'restaurant', 'mixed-use', 'mixed use',
     ])
@@ -169,8 +187,9 @@ def extract_use_type(text):
         return 'residential'
     if commercial:
         return 'commercial'
-    if any(x in t for x in ['industrial', 'warehouse', 'manufacturing']):
-        return 'industrial'
+    # "units" alone (e.g. "18 units") — only residential if no other context
+    if 'units' in t:
+        return 'residential'
     return None
 
 
