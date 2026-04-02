@@ -874,12 +874,13 @@ function addressMessage(score) {
     openSidebar();
 
     // Compare button
+    window._currentAddrName = addressShortName;
     const cmpEl = document.getElementById('compare-btn-row');
     if (cmpEl) {
       if (compareSlot) {
-        cmpEl.innerHTML = `<button onclick="addToCompare(${JSON.stringify(addressShortName)})" style="width:100%;padding:8px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;font-size:0.82rem;color:#2563eb;cursor:pointer;">Compare with ${compareSlot.name} →</button>`;
+        cmpEl.innerHTML = `<button onclick="addToCompare(window._currentAddrName)" style="width:100%;padding:8px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;font-size:0.82rem;color:#2563eb;cursor:pointer;">Compare with ${compareSlot.name} →</button>`;
       } else {
-        cmpEl.innerHTML = `<button onclick="addToCompare(${JSON.stringify(addressShortName)})" style="width:100%;padding:8px;background:#f5f5f5;border:1px solid #e0e0e0;border-radius:6px;font-size:0.82rem;color:#555;cursor:pointer;">+ Add to compare</button>`;
+        cmpEl.innerHTML = `<button onclick="addToCompare(window._currentAddrName)" style="width:100%;padding:8px;background:#f5f5f5;border:1px solid #e0e0e0;border-radius:6px;font-size:0.82rem;color:#555;cursor:pointer;">+ Add to compare</button>`;
       }
     }
   }
