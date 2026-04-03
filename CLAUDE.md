@@ -128,6 +128,16 @@ Each entry gets a hover tooltip (`reason`) explaining what was found. Reviewed r
 
 **Always add a RESEARCHED entry when**: investigating an outlier on this dashboard, diagnosing an unusual score on the map, or identifying a known data quirk that causes systematic bias for a road or road type.
 
+**Completed volume validation checks (residential streets):**
+- **Dead-end vs through-street** (April 2026): Dead-ends avg volume 12 / median 7 vs through-streets avg 31 / median 31. Dead-ends score ~60% lower — strong directional signal confirming model responds correctly to network topology.
+- **Bus route streets vs non-bus residential** (April 2026): On-bus-route segments avg volume 36 vs no-bus avg 31 (~16% higher). Modest but consistent signal — most OC Transpo residential-tagged routes run on tertiary collectors so true residential matches are limited (1,248 of 27,759 segments).
+- **Vision Zero cross-validation** (April 2026): All 16 streets from Ottawa Police 2024 top-15 collision intersection list score avg safety 84–94. Full results at `/validation`. Update list annually from Ottawa Police annual report.
+
+**Future volume validation ideas (not yet implemented):**
+- **School zone check**: Streets adjacent to elementary schools (from OSM `amenity=school`) should score higher than comparable residential streets nearby due to pickup/dropoff traffic. Requires OSM school point data.
+- **Traffic calming locations**: City of Ottawa publishes where speed humps and chicanes have been installed — these were installed on high-volume residential streets so should score above residential average. Requires finding the open data source.
+- **Crescent vs feeder pairs**: A crescent off a collector should score lower than the collector feeding it. Could spot-check known pairs to verify the relationship holds.
+
 ## Development Activity Data
 
 Two City of Ottawa datasets surface planning and construction activity near a street:
