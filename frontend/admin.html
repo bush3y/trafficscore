@@ -138,6 +138,14 @@
             ["Script",        cmd("python -m ingestion.ottawa_development")],
           ], { label: "Ottawa Open Data — Development Applications", url: "https://open.ottawa.ca/maps/ottawa::development-applications-1/about" }),
 
+          card("Vision Zero Validation Streets", [
+            ["Streets tracked",  "16 (Ottawa top-15 collision intersections)"],
+            ["Data year",        "2024"],
+            ["Expected result",  "Avg safety score ≥ 80 for all streets"],
+            ["Updates",          "Annual — update HOTSPOT_STREETS in api/main.py"],
+            ["View results",     '<a href="/validation" style="color:#3b82f6;">Model Validation page →</a>'],
+          ], { label: "Ottawa Police / CTV News annual collision report", url: "https://www.ctvnews.ca/ottawa/article/these-are-the-most-dangerous-intersections-for-collisions-in-ottawa/" }),
+
           card("Neighbourhood Boundaries", [
             ["Neighbourhoods", num(d.neighbourhoods.count)],
             ["Coverage",       "Ottawa ONS Gen 3"],

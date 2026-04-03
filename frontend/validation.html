@@ -217,9 +217,36 @@
         </table>`;
     }
 
-    fetch('/api/validation')
-      .then(r => r.json())
-      .then(d => {
+    function renderHotspots(streets) {
+      const rows = streets.map(s => {
+        const safetyOk = s.avg_safety >= 80;
+        const badge = safetyOk
+          ? `<span class="tag tag-reviewed">✓ high</span>`
+          : `<span class="tag tag-pattern">⚠ low</span>`;
+        return `<tr>
+          <td>${s.street}</td>
+          <td class="r">${s.collisions_2024}</td>
+          <td class="r">${s.avg_safety}${badge}</td>
+          <td class="r">${s.max_safety}</td>
+          <td class="r">${s.avg_composite}</td>
+          <td style="font-size:0.75rem;color:#888;">${s.intersections}</td>
+        </tr>`;
+      }).join('');
+      return `<table>
+        <thead><tr>
+          <th>Street</th>
+          <th class="r">2024 collisions</th>
+          <th class="r">Avg safety score</th>
+          <th class="r">Max safety score</th>
+          <th class="r">Avg composite</th>
+          <th>Top intersections</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+    }
+
+    Promise.all([fetch('/api/validation').then(r => r.json()), fetch('/api/validation/hotspots').then(r => r.json())])
+      .then(([d, hotspots]) => {
         const xv = d.safety_xval;
         const content = `
           <h2>Volume Score vs Measured Traffic Counts</h2>
@@ -279,6 +306,16 @@
             Hover tags for details.
           </div>
           ${renderOutliers(d.underscored, 'under')}
+
+          <h2>Vision Zero Cross-Validation</h2>
+          <div class="section-note">
+            Ottawa Police publish the top collision intersections annually. The streets below appear in the
+            2024 top-15 list. Our safety scores should be high for all of them — this confirms the model is
+            finding the right streets.
+            Source: <a href="https://www.ctvnews.ca/ottawa/article/these-are-the-most-dangerous-intersections-for-collisions-in-ottawa/" target="_blank" rel="noopener" style="color:#3b82f6;">Ottawa Police / CTV News 2024</a>.
+            Update annually by editing <code>HOTSPOT_STREETS</code> in <code>api/main.py → /api/validation/hotspots</code>.
+          </div>
+          ${renderHotspots(hotspots.streets)}
         `;
         document.getElementById('content').innerHTML = content;
         document.getElementById('footer').textContent = `Loaded at ${new Date().toLocaleTimeString()}`;

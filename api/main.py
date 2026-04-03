@@ -822,6 +822,63 @@ def validation():
     }
 
 
+@app.get("/api/validation/hotspots")
+def validation_hotspots():
+    """Safety scores for Ottawa's known high-collision streets (Vision Zero cross-validation)."""
+    # Top streets from Ottawa Police / CTV News 2024 top-15 collision intersections.
+    # Update this list annually from: https://www.ctvnews.ca/ottawa/article/these-are-the-most-dangerous-intersections-for-collisions-in-ottawa/
+    HOTSPOT_STREETS = [
+        ("Hunt Club Road",        96,  "#1 Hunt Club & Riverside, #12 Hawthorne & Hunt Club, #14 Bank & Hunt Club"),
+        ("Riverside Drive",       96,  "#1 Hunt Club & Riverside, #5 Heron & Riverside, #9 Bank & Riverside"),
+        ("Carling Avenue",        69,  "#2 Carling & Kirkwood, #15 Carling & Woodroffe"),
+        ("West Hunt Club Road",   60,  "#3 West Hunt Club & Woodroffe"),
+        ("Blair Road",            54,  "#4 Blair & Ogilvie"),
+        ("Heron Road",            51,  "#5 Heron & Riverside"),
+        ("Greenbank Road",        51,  "#6 Greenbank & West Hunt Club, #11 Greenbank & Strandherd"),
+        ("Baseline Road",         48,  "#7 Baseline & Woodroffe"),
+        ("Hazeldean Road",        48,  "#8 Hazeldean & Terry Fox"),
+        ("Bank Street",           47,  "#9 Bank & Riverside, #14 Bank & Hunt Club"),
+        ("Fallowfield Road",      46,  "#10 Fallowfield & Woodroffe"),
+        ("Strandherd Drive",      45,  "#11 Greenbank & Strandherd"),
+        ("Hawthorne Road",        45,  "#12 Hawthorne & Hunt Club"),
+        ("Woodroffe Avenue",      41,  "#3 W Hunt Club & Woodroffe, #7 Baseline & Woodroffe, #10 Fallowfield & Woodroffe, #15 Carling & Woodroffe"),
+        ("Terry Fox Drive",       41,  "#8 Hazeldean & Terry Fox"),
+        ("Ogilvie Road",          41,  "#4 Blair & Ogilvie"),
+    ]
+
+    conn = get_conn()
+    cur = conn.cursor()
+
+    results = []
+    for street_name, collisions_2024, intersections in HOTSPOT_STREETS:
+        cur.execute("""
+            SELECT
+                COUNT(*) AS segs,
+                ROUND(AVG(ss.safety_score)::numeric) AS avg_safety,
+                ROUND(MAX(ss.safety_score)::numeric) AS max_safety,
+                ROUND(AVG(ss.composite_score)::numeric) AS avg_composite
+            FROM road_segments r
+            JOIN street_scores ss ON ss.segment_id = r.id
+            WHERE r.name ILIKE %s
+              AND ss.composite_score IS NOT NULL
+        """, (street_name,))
+        row = cur.fetchone()
+        if row and row[0]:
+            results.append({
+                "street": street_name,
+                "collisions_2024": collisions_2024,
+                "intersections": intersections,
+                "segs": row[0],
+                "avg_safety": row[1],
+                "max_safety": row[2],
+                "avg_composite": row[3],
+            })
+
+    cur.close()
+    conn.close()
+    return {"streets": results, "source": "Ottawa Police / CTV News 2024 top-15 collision intersections"}
+
+
 @app.get("/validation")
 def validation_page():
     return FileResponse("frontend/validation.html")
