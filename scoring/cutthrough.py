@@ -140,10 +140,6 @@ def score_segment(seg_id: int, u, v, road_class: str, length_m: float, G: nx.Gra
     if G.degree(u) <= 1 or G.degree(v) <= 1:
         return 0.0
 
-    # Too long to be a useful shortcut
-    if length_m > MAX_SHORTCUT_LENGTH_M:
-        return 0.1
-
     # Which arterials does each end connect to?
     u_arterials = node_arterial_names(u, G, seg_name)
     v_arterials = node_arterial_names(v, G, seg_name)
@@ -151,6 +147,9 @@ def score_segment(seg_id: int, u, v, road_class: str, length_m: float, G: nx.Gra
     if u_arterials and v_arterials:
         # Both ends touch the same arterial — crescent/loop, not a shortcut
         if u_arterials & v_arterials:
+            return 0.0
+        # Too long to be a useful shortcut, but still technically connects two arterials
+        if length_m > MAX_SHORTCUT_LENGTH_M:
             return 0.1
         # Connects two *different* arterials — genuine cut-through risk
         length_factor = max(0.0, 1.0 - (length_m / MAX_SHORTCUT_LENGTH_M))
@@ -159,8 +158,8 @@ def score_segment(seg_id: int, u, v, road_class: str, length_m: float, G: nx.Gra
         # One arterial connection — moderate risk
         return 0.3
     else:
-        # Residential interior network — low risk
-        return 0.1
+        # Residential interior network — no cut-through risk
+        return 0.0
 
 
 def compute_and_save(conn):
